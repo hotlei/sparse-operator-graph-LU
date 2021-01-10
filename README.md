@@ -8,6 +8,12 @@ make
 
 ./solve path_to_file.mtx
 
+branches:
+
+main -- should compile with any c++ compiler, and run on any system
+
+vector -- only tested with g++-9, runs on i7-9800X, 10th generation 10 nm processor and later
+
 feature of code:
 
 1.block decompose matrix operations into list / graph of unit operations on 64x64 matrix, then evenly distribute to openMP thread for balanced calculation
