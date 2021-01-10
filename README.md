@@ -1,6 +1,6 @@
 # sparse-operator-graph-LU
 
-The goal of this repo is to provide an easy to understand solution with reasonable performance
+The goal of this repo is to provide an easy to understand linear system solver with reasonable performance
 
 to run the software:
 
