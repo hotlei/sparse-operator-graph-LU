@@ -21,7 +21,7 @@
 #include <vector>
 #include <string>
 #include <cstring>
-#include <math.h>
+#include <cmath>
 #include <chrono>
 #include <omp.h>
 #include <sys/mman.h>
@@ -1014,7 +1014,7 @@ namespace SOGLU
                     double *ele = data::blockstorage[a->blockindex];
                     for(int i=0; i<BLOCK64; i++)
                         for(int j=0; j<BLOCK64; j++){
-                            if(isnan(ele[i*BLOCK64+j]))
+                            if(std::isnan(ele[i*BLOCK64+j]))
                                 rtn++;
                         }
                 }
