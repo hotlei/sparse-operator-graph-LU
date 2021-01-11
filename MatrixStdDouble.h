@@ -23,8 +23,11 @@ namespace SOGLU
 
     public:
         static uint mask16[16];
+        static const double blanckdata[512];
+
         static void blockMulOneAvxBlock(double a[], double b[], double c[], unsigned long msk1, int coreIdx);
         static void blockMulOneAvxBlockNeg(double a[], double b[], double c[], unsigned long msk1, int coreIdx);
+        static void blockMulOneAvxBlock4(double* ab[], double* bb[], double c[], int blocks, unsigned long msk, int coreIdx);
 
         static void printMatrix(double* a, int n);
 
@@ -39,6 +42,7 @@ namespace SOGLU
 
         static void mat_mult(double* a, double* b, double* y, unsigned long msk1, int coreIdx);
         static void mat_mult(double* a, double* y, unsigned long msk1, int coreIdx);
+        static void mat_mult4(double *__restrict ab[], double *__restrict bb[], double *__restrict c, int blocks, unsigned long msk, int coreIdx);
 
         static bool inv_check_diag(double* a, double* b, int n);
 

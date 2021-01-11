@@ -418,7 +418,6 @@ namespace SOGLU
                 if(streamcount[si] >= 8192) 
                      std::cout<<"cache overflow -- stage "<<w<<" range "<<stagerange[w+1] - stagerange[w]<<" max "<<streamcount[si] <<std::endl;
             
-//#pragma omp parallel 
 { 
 #pragma omp parallel for schedule(dynamic) 
         for(int si=0;si<NUMSTREAM; si++){
@@ -440,7 +439,7 @@ namespace SOGLU
                         if(o.op == blockOp::mult || o.op == blockOp::llt)
                             resetOneBlock(dmp);
                         else
-                            resetOneBlock(dmp);
+                            resetOneBlockMeta(dmp);
                         
                         appendBlockStorageAgain(dmp, o.result);
                     }
@@ -465,16 +464,86 @@ namespace SOGLU
                         MatrixStdDouble::inv_lower(data::blockstorage[o.src], data::blockSize, data::blockstorage[o.result]);
                         break;
                     case blockOp::mul:
-                        MatrixStdDouble::blockMulOneAvxBlock(data::blockstorage[o.src], data::blockstorage[o.src2], 
+                        multimul = 1;
+          //
+                        if(ci<streamcount[si]-1 && data::graph[stream[si*8192+ci+1]]->result == o.result){
+                            multimul = 2;
+                            if(ci<streamcount[si]-2 && data::graph[stream[si*8192+ci+2]]->result == o.result){
+                                multimul = 3;
+                                if(ci<streamcount[si]-3 && data::graph[stream[si*8192+ci+3]]->result == o.result){
+                                    multimul = 4;
+                                if(ci<streamcount[si]-4 && data::graph[stream[si*8192+ci+4]]->result == o.result){
+                                    multimul = 5;
+                                if(ci<streamcount[si]-5 && data::graph[stream[si*8192+ci+5]]->result == o.result){
+                                    multimul = 6;
+                                }
+                                }
+                                }
+                            }
+                        }
+        /* */
+                        double* ablocks[6];
+                        double* bblocks[6];
+                        if(multimul>1){
+                            for(int blocki=0;blocki<multimul;blocki++){
+                                ablocks[blocki] = data::blockstorage[data::graph[stream[si*8192+ci+blocki]]->src];
+                                bblocks[blocki] = data::blockstorage[data::graph[stream[si*8192+ci+blocki]]->src2];
+                            }
+                        }
+                        if(multimul>1){
+                            MatrixStdDouble::blockMulOneAvxBlock4(ablocks, bblocks, data::blockstorage[o.result], multimul, 0, tid);
+                            ci = ci + multimul - 1;
+                        }else{
+                            MatrixStdDouble::blockMulOneAvxBlock(data::blockstorage[o.src], data::blockstorage[o.src2], 
                                 data::blockstorage[o.result], 0, tid);
+                        }
                         break;
                     case blockOp::mult:
-                        if(o.src2 == o.src)
-                            MatrixStdDouble::mat_mult(data::blockstorage[o.src], 
-                                data::blockstorage[o.result], 0, tid);
-                        else
-                            MatrixStdDouble::mat_mult(data::blockstorage[o.src], data::blockstorage[o.src2],
-                                data::blockstorage[o.result], 0, tid);
+                        multimul = 1;
+
+                  //
+                        if(o.src2 != o.src)
+                        if(ci<streamcount[si]-1 && data::graph[stream[si*8192+ci+1]]->result == o.result &&
+                                     data::graph[stream[si*8192+ci+1]]->src2 != data::graph[stream[si*8192+ci+1]]->src){
+                            multimul = 2;
+                            if(ci<streamcount[si]-2 && data::graph[stream[si*8192+ci+2]]->result == o.result &&
+                                     data::graph[stream[si*8192+ci+2]]->src2 != data::graph[stream[si*8192+ci+2]]->src){
+                                multimul = 3;
+                                if(ci<streamcount[si]-3 && data::graph[stream[si*8192+ci+3]]->result == o.result &&
+                                     data::graph[stream[si*8192+ci+3]]->src2 != data::graph[stream[si*8192+ci+3]]->src){
+                                    multimul = 4;
+                                if(ci<streamcount[si]-4 && data::graph[stream[si*8192+ci+4]]->result == o.result &&
+                                     data::graph[stream[si*8192+ci+4]]->src2 != data::graph[stream[si*8192+ci+4]]->src){
+                                    multimul = 5;
+                                if(ci<streamcount[si]-5 && data::graph[stream[si*8192+ci+5]]->result == o.result &&
+                                     data::graph[stream[si*8192+ci+5]]->src2 != data::graph[stream[si*8192+ci+5]]->src){
+                                    multimul = 6;
+                                }
+                                }
+                                }
+                            }
+                        }
+                  /* */
+
+                        double* ablks[6];
+                        double* bblks[6];
+                        if(multimul>1){
+                            for(int blocki=0;blocki<multimul;blocki++){
+                                ablks[blocki] = data::blockstorage[data::graph[stream[si*8192+ci+blocki]]->src];
+                                bblks[blocki] = data::blockstorage[data::graph[stream[si*8192+ci+blocki]]->src2];
+                            }
+                        }
+                        if(multimul>1){
+                            MatrixStdDouble::mat_mult4(ablks,bblks,data::blockstorage[o.result], multimul, 0, tid);
+                            ci = ci + multimul - 1;
+                        }else{
+                            if(o.src2 == o.src)
+                                MatrixStdDouble::mat_mult(data::blockstorage[o.src], 
+                                    data::blockstorage[o.result], 0, tid);
+                            else
+                                MatrixStdDouble::mat_mult(data::blockstorage[o.src], data::blockstorage[o.src2],
+                                    data::blockstorage[o.result], 0, tid);
+                        }
                         break;
 
                     case blockOp::mulneg:
