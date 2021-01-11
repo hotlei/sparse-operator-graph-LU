@@ -112,7 +112,7 @@ namespace SOGLU {
             data::clearOperations();
 
             std::chrono::steady_clock::time_point solvestart = std::chrono::steady_clock::now();
-            BlockPlanner::solve(bl2, bu2, data::b, data::blockRows);
+            BlockPlanner::solve(bl2, bu2, data::b, data::blockRows*data::blockSize);
             std::chrono::duration<double> time_solve =
                 std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now()-solvestart);
             std::cout << "solve triangled :"<<time_solve.count() <<'\n';
