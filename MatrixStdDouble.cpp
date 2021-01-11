@@ -233,6 +233,7 @@ namespace SOGLU
             updateMeta(c, BLOCK64);
         }
 /* */
+//
         void MatrixStdDouble::blockMulOneAvxBlockNeg(double *__restrict a, double *__restrict b, double *__restrict c, unsigned long msk, int coreIdx) //64
         {
             const int n = BLOCK64;
@@ -252,7 +253,7 @@ namespace SOGLU
                 double* cinn;
                 double* aaik;
                 double* bbkp;
-//*  //
+//  //
               for(int m=0;m<BLOCK64/8;m++){
                      uint16_t *metacd = (uint16_t *)(c + DETAILOFFSET);
                      metacd += DETAILSKIPSHORT * (m/4); 
@@ -617,7 +618,7 @@ namespace SOGLU
                            int fn6 = 0;
                            int fn7 = 0;
                            __m512i rzero = _mm512_set1_epi32(0x60000000u);
-//*
+//
                            __m512d r00 = _mm512_set1_pd(TINY1);
                            __m512d r01 = _mm512_set1_pd(-TINY1);
                                if(_cvtmask8_u32(_mm512_cmp_pd_mask(r16, r00, _CMP_NLE_UQ))>0 ||
@@ -686,7 +687,7 @@ namespace SOGLU
                            _mm512_store_pd ((void*) (cinn+ROWSKIP448), r23);}
                            if(fnd > 0)
                            metac[m] = metac[m] | mask16p;
-                      /* */ 
+                      // // 
                 }
                                     metacd[(m%4)*8+0] = metacm0;
                                     metacd[(m%4)*8+1] = metacm1;
@@ -698,7 +699,7 @@ namespace SOGLU
                                     metacd[(m%4)*8+7] = metacm7;
             }
         }
-
+/* */
 /*
         void MatrixStdDouble::mat_mult(double *a, double *c, unsigned long msk, int coreIdx) //64
         {      // 2.8 sec
@@ -2035,7 +2036,7 @@ namespace SOGLU
                                     metacd[(m%4)*8+7] = metacm7;
             }
         }
-
+//
         void MatrixStdDouble::blockMulOneAvxBlock(double *__restrict a, double *__restrict b, double *__restrict c, unsigned long msk, int coreIdx) //64
         {
             const int n = BLOCK64;
@@ -2055,7 +2056,7 @@ namespace SOGLU
                 double* cinn;
                 double* aaik;
                 double* bbkp;
-//*  //
+//  //
               for(int m=0;m<BLOCK64/8;m++){
                      uint16_t *metacd = (uint16_t *)(c + DETAILOFFSET);
                      metacd += DETAILSKIPSHORT * (m/4); 
@@ -2420,7 +2421,7 @@ namespace SOGLU
                            int fn6 = 0;
                            int fn7 = 0;
                            __m512i rzero = _mm512_set1_epi32(0x60000000u);
-//*
+//
                            __m512d r00 = _mm512_set1_pd(TINY1);
                            __m512d r01 = _mm512_set1_pd(-TINY1);
                                if(_cvtmask8_u32(_mm512_cmp_pd_mask(r16, r00, _CMP_NLE_UQ))>0 ||
@@ -2489,7 +2490,7 @@ namespace SOGLU
                            _mm512_store_pd ((void*) (cinn+ROWSKIP448), r23);}
                            if(fnd > 0)
                            metac[m] = metac[m] | mask16p;
-                      /* */ 
+                      // // 
                 }
                                     metacd[(m%4)*8+0] = metacm0;
                                     metacd[(m%4)*8+1] = metacm1;
@@ -2501,6 +2502,7 @@ namespace SOGLU
                                     metacd[(m%4)*8+7] = metacm7;
             }
         }
+/* */
 
         void MatrixStdDouble::printMatrix(double* a, int n)
         {
@@ -2660,7 +2662,7 @@ namespace SOGLU
 
             updateMeta(l, BLOCK64);
         }
-/*
+//
         void MatrixStdDouble::ludcmpSimple(double* a, int n, double* l, double* u)
         {
             long double sum = 0;
@@ -2701,7 +2703,8 @@ namespace SOGLU
             updateMeta(u, n);
         }
 /* */
-        void MatrixStdDouble::ludcmpSimple(double* a, int n, double* l, double* t)
+     //   void MatrixStdDouble::ludcmpSimple(double* a, int n, double* l, double* t)
+        void ludcmpSimple_x(double* a, int n, double* l, double* t)
         {
             long double sum = 0;
             alignas(64) double u[BLOCK64 * BLOCKCOL];
@@ -2817,6 +2820,7 @@ namespace SOGLU
 /* */
 
         void MatrixStdDouble::inv_upper(double* u, int n, double* y)
+//        void inv_upper_x(double* u, int n, double* y)
         {
             int i, j;
          //   for (i = 0; i < n*n; i++) y[i] = 0;
