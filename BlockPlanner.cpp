@@ -609,6 +609,202 @@ namespace SOGLU
             }
         }
 
+        void updateVector(matrix* bl, double* b, double* y, int n)
+        {
+            if(bl->level == 0){
+                if(bl->blockindex > 0){
+                    double* ldata = data::blockstorage[bl->blockindex];
+                    uint16_t *metab = (uint16_t*) (ldata + DETAILOFFSET);
+                    for(int i = 0; i < BLOCK64; i++)
+                    {
+                        uint16_t metai = metab[DETAILSKIPSHORT * (i/32) + i%32];
+                        double sum8 = 0;
+                        for(int j8 = 0; j8<BLOCK64/8; j8++){
+                            if(metai & BlockPlanner::mask[j8]){
+                                double sum = 0;
+                                for(int k=0;k<8;k++){
+                                    sum += ldata[i*BLOCKCOL+j8*8+k] * y[j8*8+k];
+                                }
+                                sum8 += sum;
+                            }
+                        }
+                        b[i] -= sum8;
+                    }
+                }
+                return;
+            }
+            int n2 = n / 2;
+            if(bl->submatrix[0] != NULL)
+                updateVector(bl->submatrix[0], b, y, n2);
+            if(bl->submatrix[1] != NULL)
+                updateVector(bl->submatrix[1], b, y+n2, n2);
+            if(bl->submatrix[2] != NULL)
+                updateVector(bl->submatrix[2], b+n2, y, n2);
+            if(bl->submatrix[3] != NULL)
+                updateVector(bl->submatrix[3], b+n2, y+n2, n2);
+        }
+        void updateVectorT(matrix* bl, double* b, double* y, int n)
+        {
+            if(bl->level == 0){
+                if(bl->blockindex > 0){
+                    double* ldata = data::blockstorage[bl->blockindex];
+                    uint16_t *metab = (uint16_t*) (ldata + DETAILOFFSET);
+                    for(int i = 0; i < BLOCK64; i++)
+                    {
+                        uint16_t metai = metab[DETAILSKIPSHORT * (i/32) + i%32];
+                        for(int j8 = 0; j8<BLOCK64/8; j8++){
+                            if(metai & BlockPlanner::mask[j8]){
+                                for(int k=0;k<8;k++){
+                                    b[j8*8+k] -= ldata[i*BLOCKCOL+j8*8+k] * y[i];
+                                }
+                            }
+                        }
+                    }
+                }
+                return;
+            }
+            int n2 = n / 2;
+            if(bl->submatrix[0] != NULL)
+                updateVectorT(bl->submatrix[0], b, y, n2);
+            if(bl->submatrix[2] != NULL)
+                updateVectorT(bl->submatrix[2], b, y+n2, n2);
+            if(bl->submatrix[1] != NULL)
+                updateVectorT(bl->submatrix[1], b+n2, y, n2);
+            if(bl->submatrix[3] != NULL)
+                updateVectorT(bl->submatrix[3], b+n2, y+n2, n2);
+        }
+
+        void lowerSolver(matrix* bl, double* b, double* y, int n)
+        {
+            if(bl->level == 0){
+                if(bl->blockindex > 0){
+                    double* ldata = data::blockstorage[bl->blockindex];
+                    uint16_t *metab = (uint16_t*) (ldata + DETAILOFFSET);
+                    for(int i = 0; i < BLOCK64; i++)
+                    {
+                        uint16_t metai = metab[DETAILSKIPSHORT * (i/32) + i%32];
+                        double sum8 = 0;
+                        for(int j8 = 0; j8<=i/8; j8++){
+                            if(metai & BlockPlanner::mask[j8]){
+                                double sum = 0;
+                                for(int k=0;k<8;k++){
+                                    if(j8*8+k<i)
+                                    sum += ldata[i*BLOCKCOL+j8*8+k] * y[j8*8+k];
+                                }
+                                sum8 += sum;
+                            }
+                        }
+                        b[i] -= sum8;
+                        y[i] = b[i] / ldata[i*BLOCKCOL+i];
+                    }
+                    
+                }
+                return;
+            }
+            int n2 = n / 2;
+            lowerSolver(bl->submatrix[0], b, y, n2);
+            if(bl->submatrix[2] != NULL)
+                updateVector(bl->submatrix[2], b+n2, y, n2);
+            lowerSolver(bl->submatrix[3], b+n2, y+n2, n2);
+        }
+
+        void upperSolverT(matrix* bu, double* b, double* x, int n)
+        {
+            if(bu->level == 0){
+                if(bu->blockindex > 0){
+                    double* ldata = data::blockstorage[bu->blockindex];
+                    uint16_t *metab = (uint16_t*) (ldata + DETAILOFFSET);
+                    for(int i = BLOCK64-1; i >= 0; i--)
+                    {
+                        uint16_t metai = metab[DETAILSKIPSHORT * (i/32) + i%32];
+                        double sum8 = 0;
+                        for(int j8 = i/8; j8<BLOCK64/8; j8++){
+               //             if(metai & BlockPlanner::mask[j8]){
+                                double sum = 0;
+                                for(int k=0;k<8;k++){
+                                    if(j8*8+k>i)
+                                    sum += ldata[i+BLOCKCOL*(j8*8+k)] * x[j8*8+k];
+                                }
+                                sum8 += sum;
+              //              }
+                        }
+                        b[i] -= sum8;
+                        x[i] = b[i] / ldata[i*BLOCKCOL+i];
+                    }
+
+                }
+                return;
+            }
+            int n2 = n / 2;
+            upperSolverT(bu->submatrix[3], b+n2, x+n2, n2);
+            if(bu->submatrix[2] != NULL)
+                updateVectorT(bu->submatrix[2], b, x+n2, n2);
+            upperSolverT(bu->submatrix[0], b, x, n2);
+        }
+        void upperSolver(matrix* bu, double* b, double* x, int n)
+        {
+            if(bu->level == 0){
+                if(bu->blockindex > 0){
+                    double* ldata = data::blockstorage[bu->blockindex];
+                    uint16_t *metab = (uint16_t*) (ldata + DETAILOFFSET);
+                    for(int i = BLOCK64-1; i >= 0; i--)
+                    {
+                        uint16_t metai = metab[DETAILSKIPSHORT * (i/32) + i%32];
+                        double sum8 = 0;
+                        for(int j8 = i/8; j8<BLOCK64/8; j8++){
+                            if(metai & BlockPlanner::mask[j8]){
+                                double sum = 0;
+                                for(int k=0;k<8;k++){
+                                    if(j8*8+k>i)
+                                    sum += ldata[i*BLOCKCOL+j8*8+k] * x[j8*8+k];
+                                }
+                                sum8 += sum;
+                            }
+                        }
+                        b[i] -= sum8;
+                        x[i] = b[i] / ldata[i*BLOCKCOL+i];
+                    }
+
+                }
+                return;
+            }
+            int n2 = n / 2;
+            upperSolver(bu->submatrix[3], b+n2, x+n2, n2);
+            if(bu->submatrix[1] != NULL)
+                updateVector(bu->submatrix[1], b, x+n2, n2);
+            upperSolver(bu->submatrix[0], b, x, n2);
+        }
+
+        void BlockPlanner::solve(matrix* bl, matrix* bu, double* b, int n)
+        {
+            double* x = (double *) aligned_alloc (64, n * data::blockSize *sizeof(double));
+            double* y = (double *) aligned_alloc (64, n * data::blockSize *sizeof(double));
+            for(int i=0;i<n* data::blockSize;i++){
+                y[i] = 0;
+                x[i] = 0;
+            }
+            lowerSolver(bl, b, y, n);
+            if(data::symmetric)
+                upperSolverT(bl, y, x, n);
+            else
+                upperSolver(bu, y, x, n);
+
+            int nancount = 0;
+            
+            data::x = (double*)memutil::getSmallMem(1, sizeof(double) * data::mSize);
+            for (int i = 0; i < data::mSize; i++) {
+                data::x[i] = x[i];
+                if (std::isnan(x[i])) {
+                    nancount++;
+                }
+            }
+
+            free(x);
+            free(y);
+            if(nancount>0)
+                std::cout<<"found NaN:  " + std::to_string(nancount)<<std::endl;
+        }
+/*
         void BlockPlanner::solve(matrix* bl, matrix* bu, double* b, int n)
         {
             double* x = (double *) aligned_alloc (64, n * data::blockSize *sizeof(double));
@@ -669,6 +865,7 @@ namespace SOGLU
             if(nancount>0)
                 std::cout<<"found NaN:  " + std::to_string(nancount)<<std::endl;
         }
+    /* */
 
         void BlockPlanner::solveUpper(double bu[], double y[], double x[], int n, int offset)
         {
