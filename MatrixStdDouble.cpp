@@ -2530,32 +2530,32 @@ namespace SOGLU
             uint16_t *metal =  (uint16_t *)(ldouble + DETAILOFFSET);
             uint16_t *metau =  (uint16_t *)(udouble + DETAILOFFSET);
             uint16_t ui = *metal;
-            uint masku = METAMASK;
-            uint maskl = 1u;
             for(int m=0; m<BLOCK64/8; m++){
                 uint ml = 0;
                 uint mu = 0;
+                uint maskl = (2u<<m) - 1u;
+                uint masku = 256u - (1u<<m);
                 for(int k=0;k<8;k++){
                     int i = m * 8 + k;
                     uint detail = (metal[DETAILSKIPSHORT * (i/32) + i%32] & METAMASK);
                     uint dl = detail & maskl;
-                    dl = dl | dl >> 8;
-                    dl = dl | dl >> 4;
-                    dl = dl | dl >> 2;
-                    dl = dl | dl >> 1;
+                    dl = dl | dl << 8;
+                    dl = dl | dl << 4;
+                    dl = dl | dl << 2;
+                    dl = dl | dl << 1;
                     dl = dl & maskl;
 
                     uint du = detail & masku;
                     ui = ui | du;
-                    du = ui;
+                    du = ui & masku;
                    
                     metal[DETAILSKIPSHORT * (i/32) + i%32] = dl;
                     metau[DETAILSKIPSHORT * (i/32) + i%32] = du;
                     ml = ml | dl;
                     mu = mu | du;
                 }
-                masku = (masku << 1) & METAMASK;
-                maskl = (maskl << 1) + 1;
+            //    masku = (masku << 1) & METAMASK;
+            //    maskl = (maskl << 1) + 1;
                 l[m] = ml;
                 u[m] = mu;
             }
@@ -2565,31 +2565,31 @@ namespace SOGLU
             uint *l = (uint *)(ldouble + METAOFFSET);
             uint16_t *metal =  (uint16_t *)(ldouble + DETAILOFFSET);
             uint16_t ui = *metal;
-            uint masku = METAMASK;
-            uint maskl = 1u;
             for(int m=0; m<BLOCK64/8; m++){
                 uint ml = 0;
                 uint mu = 0;
+                uint maskl = (2u<<m) - 1u;
+                uint masku = 256u - (1u<<m);
                 for(int k=0;k<8;k++){
                     int i = m * 8 + k;
                     uint detail = (metal[DETAILSKIPSHORT * (i/32) + i%32] & METAMASK);
                     uint dl = detail & maskl;
-                    dl = dl | dl >> 8;
-                    dl = dl | dl >> 4;
-                    dl = dl | dl >> 2;
-                    dl = dl | dl >> 1;
+                    dl = dl | dl << 8;
+                    dl = dl | dl << 4;
+                    dl = dl | dl << 2;
+                    dl = dl | dl << 1;
                     dl = dl & maskl;
 
                     uint du = detail & masku;
                     ui = ui | du;
-                    du = ui;
+                    du = ui & masku;
                    
                     metal[DETAILSKIPSHORT * (i/32) + i%32] = dl;
                     ml = ml | dl;
                     mu = mu | du;
                 }
-                masku = (masku << 1) & METAMASK;
-                maskl = (maskl << 1) + 1;
+        //        masku = (masku << 1) & METAMASK;
+        //        maskl = (maskl << 1) + 1;
                 l[m] = ml;
             }
         }
@@ -2622,6 +2622,7 @@ namespace SOGLU
             updateMeta(l, BLOCK64);
         }
 /* */
+//
         void MatrixStdDouble::lltdcmpSimple(double* a, int n, double* l)
         { // cout
             if(a == NULL){
@@ -2660,8 +2661,9 @@ namespace SOGLU
                 }
             }
 
-            updateMeta(l, BLOCK64);
+ //           updateMeta(l, BLOCK64);
         }
+/* */
 //
         void MatrixStdDouble::ludcmpSimple(double* a, int n, double* l, double* u)
         {
@@ -2703,7 +2705,7 @@ namespace SOGLU
             updateMeta(u, n);
         }
 /* */
-     //   void MatrixStdDouble::ludcmpSimple(double* a, int n, double* l, double* t)
+ //       void MatrixStdDouble::ludcmpSimple(double* a, int n, double* l, double* t)
         void ludcmpSimple_x(double* a, int n, double* l, double* t)
         {
             long double sum = 0;
@@ -2766,14 +2768,16 @@ namespace SOGLU
                             __m512d ux = _mm512_load_pd(u+i*BLOCKCOL+r*8);
                             __m512d mx = _mm512_mul_pd(lx,ux);
                             sum += _mm512_reduce_add_pd(mx);
-                       }
+                        }
+               //     for (int k = 0; k < i; k++)
+               //         sum += l[j * BLOCKCOL + k] * t[k * BLOCKCOL + i];
                     l[j * BLOCKCOL + i] = u1 * (a[j * BLOCKCOL + i] - sum);
                 }
                 l[i * BLOCKCOL + i] = 1;
             }
 
-            updateMeta(l, n);
-            updateMeta(t, n);
+  //          updateMeta(l, n);
+  //          updateMeta(t, n);
         }
 
 
