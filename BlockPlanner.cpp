@@ -439,8 +439,7 @@ namespace SOGLU
                         if(o.op == blockOp::mult || o.op == blockOp::llt)
                             resetOneBlock(dmp);
                         else
-                            resetOneBlock(dmp);
-                        //    resetOneBlockMeta(dmp);
+                            resetOneBlockMeta(dmp);
                         
                         appendBlockStorageAgain(dmp, o.result);
                     }
