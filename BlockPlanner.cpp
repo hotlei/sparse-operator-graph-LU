@@ -439,7 +439,8 @@ namespace SOGLU
                         if(o.op == blockOp::mult || o.op == blockOp::llt)
                             resetOneBlock(dmp);
                         else
-                            resetOneBlockMeta(dmp);
+                            resetOneBlock(dmp);
+                        //    resetOneBlockMeta(dmp);
                         
                         appendBlockStorageAgain(dmp, o.result);
                     }
@@ -501,7 +502,7 @@ namespace SOGLU
                     case blockOp::mult:
                         multimul = 1;
 
-                  //
+                  /*
                         if(o.src2 != o.src)
                         if(ci<streamcount[si]-1 && data::graph[stream[si*8192+ci+1]]->result == o.result &&
                                      data::graph[stream[si*8192+ci+1]]->src2 != data::graph[stream[si*8192+ci+1]]->src){
@@ -678,6 +679,22 @@ namespace SOGLU
             }
         }
 
+        double* transposeblock(double* b)
+        {
+            double* rtn = memutil::newalignedblock(0, 8);
+            std::memset(rtn, 0, ALLOCBLOCK);
+            uint16_t *metab = (uint16_t*) (b + DETAILOFFSET);
+            for(int i=0;i<BLOCK64;i++){
+                for(int j=0;j<BLOCK64;j++){
+                    uint16_t metai = metab[DETAILSKIPSHORT * (i/32) + i%32];
+                    if(metai & BlockPlanner::mask[j/8]){
+                        rtn[j*BLOCKCOL + i] = b[i*BLOCKCOL + j];
+                    }
+                }
+            }
+            return rtn;
+        }
+
         void updateVector(matrix* bl, double* b, double* y, int n)
         {
             if(bl->level == 0){
@@ -712,7 +729,40 @@ namespace SOGLU
             if(bl->submatrix[3] != NULL)
                 updateVector(bl->submatrix[3], b+n2, y+n2, n2);
         }
+
         void updateVectorT(matrix* bl, double* b, double* y, int n)
+        {
+            if(bl->level == 0){
+                if(bl->blockindex > 0){
+                    double* ldata = transposeblock(data::blockstorage[bl->blockindex]);
+                    for(int i = 0; i < BLOCK64; i++)
+                    {
+                        double sum8 = 0;
+                        for(int j8 = 0; j8<BLOCK64/8; j8++){
+                                double sum = 0;
+                                for(int k=0;k<8;k++){
+                                    sum += ldata[i*BLOCKCOL+j8*8+k] * y[j8*8+k];
+                                }
+                                sum8 += sum;
+                        }
+                        b[i] -= sum8;
+                    }
+                    memutil::freeblock(0,ldata);
+                }
+                return;
+            }
+            int n2 = n / 2;
+            if(bl->submatrix[0] != NULL)
+                updateVectorT(bl->submatrix[0], b, y, n2);
+            if(bl->submatrix[2] != NULL)
+                updateVectorT(bl->submatrix[2], b, y+n2, n2);
+            if(bl->submatrix[1] != NULL)
+                updateVectorT(bl->submatrix[1], b+n2, y, n2);
+            if(bl->submatrix[3] != NULL)
+                updateVectorT(bl->submatrix[3], b+n2, y+n2, n2);
+        }
+
+        void updateVectorT_old(matrix* bl, double* b, double* y, int n)
         {
             if(bl->level == 0){
                 if(bl->blockindex > 0){
@@ -722,11 +772,11 @@ namespace SOGLU
                     {
                         uint16_t metai = metab[DETAILSKIPSHORT * (i/32) + i%32];
                         for(int j8 = 0; j8<BLOCK64/8; j8++){
-                            if(metai & BlockPlanner::mask[j8]){
+             //               if(metai & BlockPlanner::mask[j8]){
                                 for(int k=0;k<8;k++){
                                     b[j8*8+k] -= ldata[i*BLOCKCOL+j8*8+k] * y[i];
                                 }
-                            }
+              //              }
                         }
                     }
                 }
@@ -776,8 +826,38 @@ namespace SOGLU
                 updateVector(bl->submatrix[2], b+n2, y, n2);
             lowerSolver(bl->submatrix[3], b+n2, y+n2, n2);
         }
-
         void upperSolverT(matrix* bu, double* b, double* x, int n)
+        {
+            if(bu->level == 0){
+                if(bu->blockindex > 0){
+                    double* ldata = transposeblock(data::blockstorage[bu->blockindex]);
+                    for(int i = BLOCK64-1; i >= 0; i--)
+                    {
+                        double sum8 = 0;
+                        for(int j8 = i/8; j8<BLOCK64/8; j8++){
+                                double sum = 0;
+                                for(int k=0;k<8;k++){
+                                    if(j8*8+k>i)
+                                    sum += ldata[i*BLOCKCOL+j8*8+k] * x[j8*8+k];
+                                }
+                                sum8 += sum;
+                        }
+                        b[i] -= sum8;
+                        x[i] = b[i] / ldata[i*BLOCKCOL+i];
+                    }
+                    memutil::freeblock(0,ldata);
+                }
+                return;
+            }
+            int n2 = n / 2;
+            upperSolverT(bu->submatrix[3], b+n2, x+n2, n2);
+            if(bu->submatrix[2] != NULL)
+                updateVectorT(bu->submatrix[2], b, x+n2, n2);
+            upperSolverT(bu->submatrix[0], b, x, n2);
+        }
+//
+
+        void upperSolverT_old(matrix* bu, double* b, double* x, int n)
         {
             if(bu->level == 0){
                 if(bu->blockindex > 0){
@@ -785,12 +865,16 @@ namespace SOGLU
                     uint16_t *metab = (uint16_t*) (ldata + DETAILOFFSET);
                     for(int i = BLOCK64-1; i >= 0; i--)
                     {
+               /*
                         uint16_t metai = metab[DETAILSKIPSHORT * (i/32) + i%32];
+               */
                         double sum8 = 0;
                         for(int j8 = i/8; j8<BLOCK64/8; j8++){
                //             if(metai & BlockPlanner::mask[j8]){
                                 double sum = 0;
                                 for(int k=0;k<8;k++){
+                        uint16_t metai = metab[DETAILSKIPSHORT * (j8/4) + (j8*8+k)%32];
+                                    if(metai & BlockPlanner::mask[i/8])
                                     if(j8*8+k>i)
                                     sum += ldata[i+BLOCKCOL*(j8*8+k)] * x[j8*8+k];
                                 }
@@ -843,7 +927,7 @@ namespace SOGLU
                 updateVector(bu->submatrix[1], b, x+n2, n2);
             upperSolver(bu->submatrix[0], b, x, n2);
         }
-
+//
         void BlockPlanner::solve(matrix* bl, matrix* bu, double* b, int n)
         {
             double* x = (double *) aligned_alloc (64, n * data::blockSize *sizeof(double));
@@ -873,9 +957,11 @@ namespace SOGLU
             if(nancount>0)
                 std::cout<<"found NaN:  " + std::to_string(nancount)<<std::endl;
         }
+/* */
 /*
         void BlockPlanner::solve(matrix* bl, matrix* bu, double* b, int n)
         {
+            n = n / data::blockSize;
             double* x = (double *) aligned_alloc (64, n * data::blockSize *sizeof(double));
             double* y = (double *) aligned_alloc (64, n * data::blockSize *sizeof(double));
             int i,j;
@@ -934,7 +1020,7 @@ namespace SOGLU
             if(nancount>0)
                 std::cout<<"found NaN:  " + std::to_string(nancount)<<std::endl;
         }
-    /* */
+/* */
 
         void BlockPlanner::solveUpper(double bu[], double y[], double x[], int n, int offset)
         {

@@ -715,6 +715,7 @@ namespace SOGLU
             updateMeta(c, BLOCK64);
         }
 /* */
+//
         void MatrixStdDouble::mat_mult(double *a, double *c, unsigned long msk, int coreIdx) //64
         {
             for(int i=0;i<BLOCK64;i+=STEPROW){
@@ -765,6 +766,7 @@ namespace SOGLU
             }
             updateMeta(c, BLOCK64);
         }
+/* */
 /*
         void MatrixStdDouble::mat_mult(double *__restrict a, double *__restrict b, double *__restrict c, unsigned long msk, int coreIdx) //64
         {      // 2.8 sec
@@ -1552,7 +1554,7 @@ namespace SOGLU
             updateMeta(c, BLOCK64);
         }
 /* */
-/*
+//
         void MatrixStdDouble::blockMulOneAvxBlock(double *__restrict a, double *__restrict b, double *__restrict c, unsigned long msk, int coreIdx) //64
         {                                                            //    HOT hot hotspot
             for(int i=0;i<BLOCK64;i++){
@@ -1565,6 +1567,7 @@ namespace SOGLU
             updateMeta(c, BLOCK64);
         }
 /* */
+
         void MatrixStdDouble::blockMulOneAvxBlock4(double* ab[], double* bb[], double c[], int blocks, unsigned long msk, int coreIdx) //64
         {
             const int n = BLOCK64;
@@ -2036,7 +2039,7 @@ namespace SOGLU
                                     metacd[(m%4)*8+7] = metacm7;
             }
         }
-//
+/*
         void MatrixStdDouble::blockMulOneAvxBlock(double *__restrict a, double *__restrict b, double *__restrict c, unsigned long msk, int coreIdx) //64
         {
             const int n = BLOCK64;
