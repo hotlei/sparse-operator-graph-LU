@@ -24,4 +24,4 @@ feature of code:
 
 4.majority of unit operations (/ hot spot) are multiplication of 64x64 matrix, which I can not get much faster than the 3 loop implementation
 
-5.not memory efficient, use 5 times more than the better solvers for certain example, can and will be cut in half. put swap on NVME SSD helps
+5.not memory efficient, use 5 times more than a more complicated solvers for certain example, can and will be cut in half. put swap on NVME SSD helps
