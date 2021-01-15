@@ -37,13 +37,6 @@ namespace SOGLU
 
         static void solve(matrix* bl, matrix* bu, double b[], int n);
 
-        static void solveUpper(double bu[], double y[], double x[], int n, int offset);
-        static void bx(double bu[], double y[], double x[], int n, int ioffset, int joffset);
-
-        static void solveLower(double bl[], double b[], double y[], int n, int offset);
-
-        static void cy(double bl[], double b[], double y[], int n, int ioffset, int joffset);
-        
         static bool checkSymmetric(matrix* mat, int n, int blocksize, int* indexi, int* indexj, double* vals, int valcount);
 
         static void blockMatrixLU(matrix* a, matrix* l, matrix* u, int n, matrix* hl1, matrix* hu1, int group=0);
