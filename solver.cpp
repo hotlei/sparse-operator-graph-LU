@@ -118,6 +118,83 @@ namespace SOGLU {
             std::cout << "solve triangled :"<<time_solve.count() <<'\n';
         }
 
+        double* decompose_solveX()
+        {
+            if(data::symmetric) std::cout << "symmetric" <<std::endl;
+            std::chrono::steady_clock::time_point timestart = std::chrono::steady_clock::now();
+            int count = data::valcount;
+
+            BlockPlanner::appendBlockStorage(NULL);
+            data::PlanL2 = true;
+
+            data::blockSize = config::blockSizeL2;
+            data::blockRows = config::blockRowsL2;
+
+            BlockPlanner::checkBlock();
+            BlockPlanner::iniBlockStorage();
+
+            int n = data::blockRows;
+            int levels = __builtin_popcount(data::blockRows-1);
+            matrix *bl =  memutil::newmatrix(0,n,levels);
+            matrix *bu =  memutil::newmatrix(0,n,levels);
+
+            matrix *mx =  BlockPlanner::iniVectorMatrix(n);
+            matrix *my =  BlockPlanner::iniVectorMatrix(n);
+            matrix *mlhs =  BlockPlanner::iniVectorMatrix(n);
+            
+            if(data::symmetric)
+                BlockPlanner::blockMatrixLLT(data::blocks, bl, n, NULL);
+            else
+                BlockPlanner::blockMatrixLU(data::blocks, bl, bu, n, NULL, NULL,0, mx, my, mlhs);
+
+            std::cout<<"blocks: "<<data::blockRows<<" blockSize: "<<data::blockSize<<" inputSize: "<<data::mSize  
+                     <<" extend: "<<data::blockRows * data::blockSize<<" op count: "<<data::graph.size()<<
+                       " storage: "<<data::storageCount<<std::endl;
+
+            if(data::symmetric)
+                BlockPlanner::blockPlan(bl, NULL);
+            else
+                BlockPlanner::blockPlan(mx, NULL);
+
+            data::PlanL2 = false;
+            data::blockSize = BLOCK64;
+            int levelall = __builtin_popcount(data::blockRows-1);
+            matrix *x2 = memutil::newmatrix(0,data::blockRows,levelall);
+
+     //       if(!data::symmetric)
+                BlockPlanner::copyOperatorX2(data::blocks, mx, my, mlhs, x2, n);
+            memutil::freeAllSmallMem(0);
+            n = data::blockRows;
+
+            std::cout<<"blocks: "<<data::blockRows<<" blockSize: "<<data::blockSize<<" inputSize: "<<data::mSize  
+                     <<" extend: "<<data::blockRows * data::blockSize<<" op count: "<<data::graph.size()<<
+                       " storage: "<<data::storageCount<<std::endl;
+
+            BlockPlanner::blockPlan(x2, NULL);
+            std::chrono::duration<double> time_plan = 
+                std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now()-timestart);
+            std::cout << "plan time: "<<time_plan.count() <<'\n';
+            std::chrono::steady_clock::time_point calcstart = std::chrono::steady_clock::now();
+
+            BlockPlanner::calculate();
+
+            std::chrono::duration<double> time_calc = 
+                std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now()-calcstart);
+            std::cout << "kernel time: "<<time_calc.count() <<'\n';
+
+            data::clearOperations();
+
+            std::chrono::steady_clock::time_point solvestart = std::chrono::steady_clock::now();
+
+            double *xx =  (double*)memutil::getSmallMem(0, config::blockRows * config::blockSize * sizeof(double));
+            std::memset(xx, 0, config::blockRows * config::blockSize * sizeof(double));
+            BlockPlanner::getFirstColumn(x2, xx, data::blockRows*data::blockSize);
+            std::chrono::duration<double> time_solve =
+                std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now()-solvestart);
+            std::cout << "solve triangled :"<<time_solve.count() <<'\n';
+            return xx;
+        }
+
         double* solveLU(int dim, int valcount, bool symmetric, int* index_i, int* index_j, double* vals, double* b) 
         {
             std::chrono::steady_clock::time_point timestart = std::chrono::steady_clock::now();
@@ -167,9 +244,9 @@ namespace SOGLU {
             std::cout << "re Order time: "<<time_plan.count() <<'\n';
             GOrder::clearmost();
 
-            decompose_solveLU();
+            double* x = decompose_solveX();
 
-            double * nr =  GOrder::reOrderResult(data::x);
+            double* nr =  GOrder::reOrderResult(x);
 
             data::clear();
             GOrder::clear();

@@ -787,6 +787,102 @@ namespace SOGLU
                 std::cout<<"found NaN:  " + std::to_string(nancount)<<std::endl;
         }
 
+        void BlockPlanner::blockMatrixLU(matrix* a, matrix* l, matrix* u, int n, matrix* l3, matrix* u3, int group, matrix* x, matrix* y, matrix* lhs)
+        {
+            int hn = n / 2;
+            double *tmp = NULL;
+            if(a->level == 0){
+                if(a->blockindex > 0){
+                    if(l->blockindex <= 0){
+                        l->blockindex = appendBlockStorage(tmp);
+                    }
+                    if(u->blockindex <= 0){
+                        u->blockindex = appendBlockStorage(tmp);
+                    }
+                    data::graph.push_back(memutil::newoperation(a->blockindex, 0, blockOp::lu, l->blockindex, u->blockindex, 0, group));
+                }
+                return;
+            }
+            matrix* ha = a->submatrix[0];
+            matrix* l1 = memutil::newmatrix(0,a->blockrows2/2,a->level-1);
+            matrix* u1 = memutil::newmatrix(0,a->blockrows2/2,a->level-1);
+            matrix* l2 = l3;
+            matrix* u2 = u3;
+            if(l2 == NULL){
+                l2 = memutil::newmatrix(0,a->blockrows2/2,a->level-1);
+                u2 = memutil::newmatrix(0,a->blockrows2/2,a->level-1);
+            }
+            matrix* hl1 = NULL;
+            matrix* hu1 = NULL;
+            if(a->level>1){
+                hl1 = memutil::newmatrix(0,a->blockrows2/4,a->level-2);
+                hu1 = memutil::newmatrix(0,a->blockrows2/4,a->level-2);
+            }
+            blockMatrixLU(ha,l1,u1,n/2,hl1,hu1,group);
+            blockMatrixInvLower(l1,l2,n/2,hl1,group);
+            blockMatrixInvUpper(u1,u2,n/2,hu1,group);
+            l->submatrix[0] = l1;                // l2 ????
+            u->submatrix[0] = u1;
+           
+            if(a->level == 1){
+                blockMatrixMul(l2,lhs->submatrix[0],y->submatrix[0],hn,group);
+                blockMatrixMul(u2,y->submatrix[0],x->submatrix[0],hn,group);
+            }
+
+            matrix* aua1b = memutil::newmatrix(0,a->blockrows2/2,a->level-1);
+            matrix* b = a->submatrix[1];
+            if(b != NULL){
+                matrix* a1b = memutil::newmatrix(0,a->blockrows2/2,a->level-1);
+                blockMatrixMul(l2,b,aua1b,hn,group);
+                u->submatrix[1] = aua1b;
+                blockMatrixMulNeg(aua1b,x->submatrix[2],y->submatrix[0],hn,group);
+            }
+
+            matrix* dsub = memutil::newmatrix(0,a->blockrows2/2,a->level-1);
+            matrix* d = a->submatrix[3];
+
+            matrix* c = a->submatrix[2];
+            if(c != NULL){
+                matrix* ca1 = memutil::newmatrix(0,a->blockrows2/2,a->level-1);
+                matrix* ca1al = memutil::newmatrix(0,a->blockrows2/2,a->level-1);
+                blockMatrixMul(c,u2,ca1al,hn,group);
+                l->submatrix[2] = ca1al;
+
+        //    matrix* y2 = memutil::newmatrix(0,a->blockrows2/2,a->level-1);
+        //    matrix* b2 = memutil::newmatrix(0,a->blockrows2/2,a->level-1);
+        //    blockMatrixMul(ca1al,y->submatrix[0],y2,hn,group);
+        //    blockMatrixSub(lhs->submatrix[2],y2,b2,hn,group);
+                blockMatrixMulNeg(ca1al,y->submatrix[0],lhs->submatrix[2],hn,group);
+
+                matrix* ca1b = memutil::newmatrix(0,a->blockrows2/2,a->level-1);
+
+                blockMatrixMul(ca1al, aua1b, ca1b, hn,group);
+                blockMatrixSub(d, ca1b, dsub, hn,group);
+            } else {
+                dsub = d;
+            }
+
+            l1 = memutil::newmatrix(0,a->blockrows2/2,a->level-1);
+            u1 = memutil::newmatrix(0,a->blockrows2/2,a->level-1);
+            matrix* dl1 = NULL;
+            matrix* du1 = NULL;
+            if(a->level>1){
+                dl1 = memutil::newmatrix(0,a->blockrows2/4,a->level-2);
+                du1 = memutil::newmatrix(0,a->blockrows2/4,a->level-2);
+            }
+            blockMatrixLU(dsub,l1,u1,hn,dl1,du1,group,x->submatrix[2],y->submatrix[2],lhs->submatrix[2] );
+            l->submatrix[3] = l1;
+            u->submatrix[3] = u1;
+
+            if(a->level == 1){
+                hl1 = memutil::newmatrix(0,a->blockrows2/4,a->level-2);
+                hu1 = memutil::newmatrix(0,a->blockrows2/4,a->level-2);
+                blockMatrixInvLower(l1,l2,n/2,hl1,group);
+                blockMatrixMul(l2,lhs->submatrix[2],y->submatrix[2],hn,group);
+                blockMatrixInvUpper(u1,u2,n/2,hu1,group);
+                blockMatrixMul(u2,y->submatrix[2],x->submatrix[2],hn,group);
+            }
+        }
         void BlockPlanner::blockMatrixLU(matrix* a, matrix* l, matrix* u, int n, matrix* l3, matrix* u3, int group)
         {
             int hn = n / 2;
@@ -1254,6 +1350,142 @@ namespace SOGLU
             }
         }
 
+        void BlockPlanner::copyOperatorX2(matrix* a, matrix* x1, matrix* y1, matrix* lhs1, matrix* mx2, int n)
+	{
+            blockstorageL2.clear();
+            storageCountL2 =0;
+
+	    int originSize = data::blockRows * data::blockRows;
+	    int i,j;
+	    int L2Rows = data::blockRows;
+            data::blockSize = config::blockSize;
+            data::blockRows = config::blockRows;
+	    int scaleL2 = config::blockSizeL2 / config::blockSize;
+            int levelL2 = __builtin_popcount(scaleL2 - 1);
+		   
+            mx2->blockrows2 = data::blockRows;
+            mx2->level = __builtin_popcount(data::blockRows - 1);
+
+	    blockstorageL2.resize(data::blockstorage.size(),NULL);
+	    storageCountL2 = blockstorageL2.size();
+
+	    checkBlock();
+	    iniBlockStorage();
+
+            double *xx =  (double*)memutil::getSmallMem(0, config::blockRows * config::blockSize * sizeof(double));
+            std::memset(xx, 0, config::blockRows * config::blockSize * sizeof(double));
+            matrix *mx =  BlockPlanner::iniVectorMatrix(xx, n);
+            matrix *my =  BlockPlanner::iniVectorMatrix(xx, n);
+            matrix *mlhs =  BlockPlanner::iniVectorMatrix(data::b, n);
+
+            matrixZoomSet(a, data::blocks);
+            matrixZoomSet(x1, mx);
+            matrixZoomSet(y1, my);
+            matrixZoomSet(lhs1, mlhs);
+
+	    graphL2.clear();
+	    for (i = 0; i < data::graph.size(); i++)
+	    {
+		operation o = *(data::graph[i]);
+                       operation* nop = memutil::newoperation(o.src, o.src2, o.op, o.result, o.result2, 0, o.groupNum);
+                      nop->sequenceNum = o.sequenceNum;
+		graphL2.push_back(nop);
+	    }
+	    data::graph.clear();
+
+
+	    for (i = 0; i < graphL2.size(); i++)
+	    {
+		operation o = *(graphL2[i]);
+		if (o.skip)
+		    continue;
+		if (o.result > 0)
+		{
+		    if (blockstorageL2[o.result] == NULL)
+		    {
+			matrix* dmp = memutil::newmatrix(0,scaleL2,levelL2);
+			appendBlockStorageAgainL2(dmp, o.result);
+		    }
+		}
+
+		if (o.result2 > 0)
+		{
+		    if (blockstorageL2[o.result2] == NULL)
+		    {
+			matrix* dmp = memutil::newmatrix(0,scaleL2,levelL2);
+			appendBlockStorageAgainL2(dmp, o.result2);
+		    }
+		}
+
+		switch (o.op)
+		{
+		    case blockOp::inv:
+			blockMatrixInv(blockstorageL2[o.src], blockstorageL2[o.result], scaleL2, o.sequenceNum);
+			break;
+
+		    case blockOp::lowerInv:
+			blockMatrixInvLower(blockstorageL2[o.src], blockstorageL2[o.result], scaleL2, NULL, o.sequenceNum);
+			break;
+
+		    case blockOp::lu:
+			blockMatrixLU(blockstorageL2[o.src], blockstorageL2[o.result], blockstorageL2[o.result2], scaleL2, NULL, NULL, o.sequenceNum);
+			break;
+
+		    case blockOp::llt:
+			blockMatrixLLT(blockstorageL2[o.src], blockstorageL2[o.result], scaleL2, NULL, o.sequenceNum);
+			break;
+
+		    case blockOp::mul:
+			
+                        if(blockstorageL2[o.src] == NULL || blockstorageL2[o.src2] == NULL){
+                               std::cout<<o.src<<"  "<<blockstorageL2[o.src]<<"   "<<o.src2<<"  "<<blockstorageL2[o.src2]<<std::endl;
+                        }
+			blockMatrixMul(blockstorageL2[o.src], blockstorageL2[o.src2], blockstorageL2[o.result], scaleL2, o.sequenceNum);
+			break;
+
+		    case blockOp::mult:
+			
+			blockMatrixMulT(blockstorageL2[o.src], blockstorageL2[o.src2], blockstorageL2[o.result], scaleL2, o.sequenceNum);
+			break;
+
+		    case blockOp::mulneg:
+			blockMatrixMulNeg(blockstorageL2[o.src], blockstorageL2[o.src2], blockstorageL2[o.result], scaleL2, o.sequenceNum);
+			break;
+
+		    case blockOp::sub:
+			if(o.src>0){
+			    if(o.src2>0){
+				blockMatrixSub(blockstorageL2[o.src2], blockstorageL2[o.src], blockstorageL2[o.result], scaleL2, o.sequenceNum);
+			    }
+			    else{
+				blockMatrixNeg(blockstorageL2[o.src], blockstorageL2[o.result], scaleL2, o.sequenceNum);
+			    }
+			}
+			else{
+			    if(o.src2>0){
+				printInt(blockstorageL2[o.src2], scaleL2);
+				blockMatrixCopy(blockstorageL2[o.src2], blockstorageL2[o.result], scaleL2, o.sequenceNum);
+			    }
+			}
+			break;
+
+		    case blockOp::upperInv:
+			blockMatrixInvUpper(blockstorageL2[o.src], blockstorageL2[o.result], scaleL2, NULL, o.sequenceNum);
+			break;
+
+		    default:
+			break;
+		}
+
+	    }
+
+            matrixZoomUpdate(x1, mx2);
+
+            blockstorageL2.clear();
+            storageCountL2 =0;
+            graphL2.clear();
+	}
+
         void BlockPlanner::copyOperatorL2(matrix* a, matrix* l, matrix* u, matrix* LL2, matrix* UL2, int n)
 	{
             blockstorageL2.clear();
@@ -1392,6 +1624,72 @@ namespace SOGLU
 	    data::storageCount = 1;
 	}
 
+        void setupFirstColumn(matrix *b)
+        {
+            if(b->level == 0){
+                b->blockindex = BlockPlanner::claimBlock();
+                return;
+            }
+            int n2 = b->blockrows2 / 2;
+            b->submatrix[0] = memutil::newmatrix(0,n2,b->level-1);
+            b->submatrix[2] = memutil::newmatrix(0,n2,b->level-1);
+            setupFirstColumn(b->submatrix[0]);
+            setupFirstColumn(b->submatrix[2]);
+        }
+        matrix* BlockPlanner::iniVectorMatrix(int n)
+        {
+            int levels = __builtin_popcount(n-1);
+            matrix *b =  memutil::newmatrix(0,n,levels);
+            setupFirstColumn(b);
+            return b;
+        }
+
+        void BlockPlanner::getFirstColumn(matrix *m, double* b, int n)
+        {
+            if(m->level == 0){
+                double* dmp = data::blockstorage[m->blockindex];
+                unsigned short *metad = (unsigned short *) (dmp + DETAILOFFSET);
+                for(int i=0;i<BLOCK64;i++){
+                    if(metad[i%32+(i/32)*DETAILSKIPSHORT] & 1 )
+                        b[i] = dmp[i*BLOCKCOL];
+                }
+                return;
+            }
+            int n2 = m->blockrows2 / 2;
+            getFirstColumn(m->submatrix[0], b, n2);
+            getFirstColumn(m->submatrix[2], b+n2, n2);
+        }
+        void assignFirstColumn(matrix *m, double* b, int n)
+        {
+            if(m->level == 0){
+                m->blockindex = BlockPlanner::claimBlock();
+                double* dmp = (double *) memutil::newalignedblock(0,8);
+                BlockPlanner::resetOneBlock(dmp);
+                for(int i=0;i<BLOCK64;i++){
+                    dmp[i*BLOCKCOL] = b[i];
+                }
+                uint *metay = (uint*) (dmp + METAOFFSET);
+                for(int i=0;i<n/8;i++) metay = 1;
+                unsigned short *metad = (unsigned short *) (dmp + DETAILOFFSET);
+                for(int i=0;i<BLOCK64;i++) 
+                    metad[i%32+(i/32)*DETAILSKIPSHORT] = 1;
+                BlockPlanner::appendBlockStorageAgain(dmp, m->blockindex);
+                return;
+            }
+            int n2 = m->blockrows2 / 2;
+            m->submatrix[0] = memutil::newmatrix(0,n2,m->level-1);
+            m->submatrix[2] = memutil::newmatrix(0,n2,m->level-1);
+            assignFirstColumn(m->submatrix[0], b, n2);
+            assignFirstColumn(m->submatrix[2], b+n2, n2);
+        }
+        matrix* BlockPlanner::iniVectorMatrix(double *b, int n)
+        {
+            int levels = __builtin_popcount(n-1);
+            matrix *m =  memutil::newmatrix(0,n,levels);
+            assignFirstColumn(m,b,n);
+            return m;
+        }
+
 	void BlockPlanner::iniBlockStorage()
 	{
 	    int i, bi, bj;
@@ -1466,6 +1764,14 @@ namespace SOGLU
                     memutil::clearmemory = false;
 		}
                
+        uint64_t BlockPlanner::claimBlock()
+        {
+            double* dmp = NULL;
+            uint64_t t = data::blockstorage.size();
+            data::blockstorage.push_back( dmp );
+            data::storageCount = t+1;
+            return t;
+        }
 	uint64_t BlockPlanner::allocateBlock(int bi, int bj)
 	{
 	    double* dmp = NULL;
