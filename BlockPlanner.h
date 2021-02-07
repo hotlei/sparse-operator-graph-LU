@@ -30,7 +30,7 @@ namespace SOGLU
         static int storageCountL2;
         static std::vector<operation*> graphL2;
 
-        static void blockPlan(matrix* saved, matrix* savedu);
+        static void blockPlan(matrix* saved, matrix* savedu, matrix* lhs=NULL);
         static void copyOperatorL2(matrix* a, matrix* l, matrix* u, matrix* bl2, matrix* bu2, int n);
         static void copyOperatorX2(matrix* a, matrix* x1, matrix* y1, matrix* lhs1, matrix* mx2, int n);
 

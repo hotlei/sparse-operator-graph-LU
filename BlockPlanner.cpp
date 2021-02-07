@@ -99,8 +99,18 @@ namespace SOGLU
             }
             return count;
         }
+ 
+        void printOP()
+        {
+            for(int i = 0; i<data::graph.size(); i++)
+            {
+                operation* o = data::graph[i];
+                printf("stage %8d  %8d  %8d src %8d %8d op %4d result %8d %8d \n",
+                     o->stage, o->groupNum, o->sequenceNum, o->src, o->src2, o->op, o->result, o->result2);
+            }
+        }
 
-          void BlockPlanner::blockPlan(matrix* saved, matrix* savedu)
+        void BlockPlanner::blockPlan(matrix* saved, matrix* savedu, matrix* lhs)
         {
             long i, cnt = 0;
 
@@ -122,13 +132,15 @@ namespace SOGLU
             data::stage[0] = 1;
             cnt = addInput(data::blocks, lastuse);
 
-            if (saved != NULL)
-            {
+            if(lhs != NULL) {
+                cnt += addInput(lhs, lastuse);
+            }
+
+            if (saved != NULL) {
                 maxcnt += addOutput(saved, lastuse, maxx);
             }
 
-            if (savedu != NULL)
-            {
+            if (savedu != NULL) {
                 maxcnt += addOutput(savedu, lastuse, maxx);
             }
 
@@ -184,7 +196,7 @@ namespace SOGLU
                 if (o->result2 > 0 && lastuse[o->result2] > 0) continue;
                 ++wastecount;
             }
-        if(data::PlanL2 || wastecount>(data::graph.size()/25)){
+        if(data::PlanL2 || wastecount>(data::graph.size()/25)){ // /25
             int bufcount = data::graph.size() - wastecount;
             operation *buf = new operation[bufcount];
             int bufcounter = 0;
@@ -379,6 +391,7 @@ namespace SOGLU
          
             int curStage = -1;
             int blk;
+
 
             int maxstage = data::graph[data::graph.size()-1]->stage;
             long* stagerange = (long*) malloc((maxstage*2 + 2)*sizeof(long));
@@ -818,13 +831,14 @@ namespace SOGLU
                 hl1 = memutil::newmatrix(0,a->blockrows2/4,a->level-2);
                 hu1 = memutil::newmatrix(0,a->blockrows2/4,a->level-2);
             }
-            blockMatrixLU(ha,l1,u1,n/2,hl1,hu1,group);
+            blockMatrixLU(ha,l1,u1,n/2,hl1,hu1,group,x->submatrix[0],y->submatrix[0],lhs->submatrix[0]);
             blockMatrixInvLower(l1,l2,n/2,hl1,group);
             blockMatrixInvUpper(u1,u2,n/2,hu1,group);
             l->submatrix[0] = l1;                // l2 ????
             u->submatrix[0] = u1;
            
-            if(a->level == 1){
+            if(a->level == 1)
+            {
                 blockMatrixMul(l2,lhs->submatrix[0],y->submatrix[0],hn,group);
                 blockMatrixMul(u2,y->submatrix[0],x->submatrix[0],hn,group);
             }
@@ -874,12 +888,13 @@ namespace SOGLU
             l->submatrix[3] = l1;
             u->submatrix[3] = u1;
 
-            if(a->level == 1){
-                hl1 = memutil::newmatrix(0,a->blockrows2/4,a->level-2);
-                hu1 = memutil::newmatrix(0,a->blockrows2/4,a->level-2);
-                blockMatrixInvLower(l1,l2,n/2,hl1,group);
+            if(a->level == 1)
+            {
+             //   hl1 = memutil::newmatrix(0,a->blockrows2/4,a->level-2);
+             //   hu1 = memutil::newmatrix(0,a->blockrows2/4,a->level-2);
+                blockMatrixInvLower(l1,l2,n/2,NULL,group);
                 blockMatrixMul(l2,lhs->submatrix[2],y->submatrix[2],hn,group);
-                blockMatrixInvUpper(u1,u2,n/2,hu1,group);
+                blockMatrixInvUpper(u1,u2,n/2,NULL,group);
                 blockMatrixMul(u2,y->submatrix[2],x->submatrix[2],hn,group);
             }
         }
@@ -1136,12 +1151,16 @@ namespace SOGLU
         void BlockPlanner::printInt(matrix* a, int n)
         {
                int line = 8;
-  /*             for(int i=0;i<n*n;i++){
-                  std::cout<<a[i]<<"  \b";
+               for(int i=0;i<n*n;i++){
+                  int e = a[0][i];
+                  if(e == 0)
+                      std::cout<<"   "<<"  \b";
+                  else
+                      std::cout<<e<<"  \b";
                   if((i%line)==line-1)
                      std::cout<<std::endl;
                }
-  /**/
+  
         }
 
         void BlockPlanner::blockMatrixSub(matrix* a, matrix*b, matrix* c, int n, int group)
@@ -1325,8 +1344,12 @@ namespace SOGLU
 
         void matrixZoomSet(matrix* a, matrix* detail)
         {
-            if(a->level == 0 && a->blockindex > 0){
-		SOGLU::BlockPlanner::appendBlockStorageAgainL2(detail, a->blockindex);
+            if(a->level == 0){
+                if(a->blockindex > 0){
+		    SOGLU::BlockPlanner::appendBlockStorageAgainL2(detail, a->blockindex);
+                }else{
+                    std::cout<<a<<"  "<<detail<<std::endl;
+                }
             }else if(a->level > 0){
                 for(int i=0; i<4; i++)
                     if(a->submatrix[i] != NULL){
@@ -1344,7 +1367,7 @@ namespace SOGLU
             }else if(l->level > 1){
                 for(int i=0; i<4; i++)
                     if(l->submatrix[i] != NULL){
-                        bl2->submatrix[i] = memutil::newmatrix(0,l->blockrows2/2,l->level-1);
+                        bl2->submatrix[i] = memutil::newmatrix(0,bl2->blockrows2/2,bl2->level-1);
                         matrixZoomUpdate(l->submatrix[i], bl2->submatrix[i]);
                     }
             }
@@ -1374,9 +1397,9 @@ namespace SOGLU
 
             double *xx =  (double*)memutil::getSmallMem(0, config::blockRows * config::blockSize * sizeof(double));
             std::memset(xx, 0, config::blockRows * config::blockSize * sizeof(double));
-            matrix *mx =  BlockPlanner::iniVectorMatrix(xx, n);
-            matrix *my =  BlockPlanner::iniVectorMatrix(xx, n);
-            matrix *mlhs =  BlockPlanner::iniVectorMatrix(data::b, n);
+            matrix *mx =  BlockPlanner::iniVectorMatrix(xx, config::blockRows);
+            matrix *my =  BlockPlanner::iniVectorMatrix(xx, config::blockRows);
+            matrix *mlhs =  BlockPlanner::iniVectorMatrix(data::b, config::blockRows);
 
             matrixZoomSet(a, data::blocks);
             matrixZoomSet(x1, mx);
@@ -1463,7 +1486,7 @@ namespace SOGLU
 			}
 			else{
 			    if(o.src2>0){
-				printInt(blockstorageL2[o.src2], scaleL2);
+				//printInt(blockstorageL2[o.src2], scaleL2);
 				blockMatrixCopy(blockstorageL2[o.src2], blockstorageL2[o.result], scaleL2, o.sequenceNum);
 			    }
 			}
@@ -1480,6 +1503,7 @@ namespace SOGLU
 	    }
 
             matrixZoomUpdate(x1, mx2);
+
 
             blockstorageL2.clear();
             storageCountL2 =0;
@@ -1592,7 +1616,7 @@ namespace SOGLU
 			}
 			else{
 			    if(o.src2>0){
-				printInt(blockstorageL2[o.src2], scaleL2);
+				//printInt(blockstorageL2[o.src2], scaleL2);
 				blockMatrixCopy(blockstorageL2[o.src2], blockstorageL2[o.result], scaleL2, o.sequenceNum);
 			    }
 			}
@@ -1650,12 +1674,12 @@ namespace SOGLU
                 double* dmp = data::blockstorage[m->blockindex];
                 unsigned short *metad = (unsigned short *) (dmp + DETAILOFFSET);
                 for(int i=0;i<BLOCK64;i++){
-                    if(metad[i%32+(i/32)*DETAILSKIPSHORT] & 1 )
+      //              if(metad[i%32+(i/32)*DETAILSKIPSHORT] & 1 )
                         b[i] = dmp[i*BLOCKCOL];
                 }
                 return;
             }
-            int n2 = m->blockrows2 / 2;
+            int n2 = n / 2;
             getFirstColumn(m->submatrix[0], b, n2);
             getFirstColumn(m->submatrix[2], b+n2, n2);
         }
@@ -1669,7 +1693,7 @@ namespace SOGLU
                     dmp[i*BLOCKCOL] = b[i];
                 }
                 uint *metay = (uint*) (dmp + METAOFFSET);
-                for(int i=0;i<n/8;i++) metay = 1;
+                for(int i=0;i<n/8;i++) *metay = 1;
                 unsigned short *metad = (unsigned short *) (dmp + DETAILOFFSET);
                 for(int i=0;i<BLOCK64;i++) 
                     metad[i%32+(i/32)*DETAILSKIPSHORT] = 1;
@@ -1680,7 +1704,7 @@ namespace SOGLU
             m->submatrix[0] = memutil::newmatrix(0,n2,m->level-1);
             m->submatrix[2] = memutil::newmatrix(0,n2,m->level-1);
             assignFirstColumn(m->submatrix[0], b, n2);
-            assignFirstColumn(m->submatrix[2], b+n2, n2);
+            assignFirstColumn(m->submatrix[2], b+n2*BLOCK64, n2);
         }
         matrix* BlockPlanner::iniVectorMatrix(double *b, int n)
         {

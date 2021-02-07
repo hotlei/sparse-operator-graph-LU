@@ -154,7 +154,7 @@ namespace SOGLU {
             if(data::symmetric)
                 BlockPlanner::blockPlan(bl, NULL);
             else
-                BlockPlanner::blockPlan(mx, NULL);
+                BlockPlanner::blockPlan(mx, NULL, mlhs);
 
             data::PlanL2 = false;
             data::blockSize = BLOCK64;
@@ -188,7 +188,7 @@ namespace SOGLU {
 
             double *xx =  (double*)memutil::getSmallMem(0, config::blockRows * config::blockSize * sizeof(double));
             std::memset(xx, 0, config::blockRows * config::blockSize * sizeof(double));
-            BlockPlanner::getFirstColumn(x2, xx, data::blockRows*data::blockSize);
+            BlockPlanner::getFirstColumn(x2, xx, config::blockRows * config::blockSize);
             std::chrono::duration<double> time_solve =
                 std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now()-solvestart);
             std::cout << "solve triangled :"<<time_solve.count() <<'\n';
