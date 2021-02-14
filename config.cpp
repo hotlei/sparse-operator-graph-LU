@@ -45,6 +45,8 @@ namespace SOGLU {
         blockRows = roundup(mSize / blockSize);
 
         blockRowsL2 = 2<<(__builtin_popcount(blockRows-1)/2);
+        if(blockRows / blockRowsL2 > 4)
+           blockRowsL2 *= 2;
         blockSizeL2 = blockSize * blockRows / blockRowsL2;
     }
 }

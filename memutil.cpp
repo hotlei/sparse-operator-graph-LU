@@ -274,6 +274,8 @@ namespace SOGLU{
         operation* memutil::newoperation(int src1, int s2, blockOp o, int d1, int d2, int threadId, int group)
         {
             int que = threadId;
+            if(src1 == 26878)
+               std::cout<<std::endl;
 
             int last = operationBuffer[que].size()-1;
             if(last == -1 || operationPointer[que] == -1 || operationPointer[que] + sizeof(operation) >= MEMBLOB){

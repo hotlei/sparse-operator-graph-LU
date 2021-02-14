@@ -32,7 +32,7 @@ namespace SOGLU
 
         static void blockPlan(matrix* saved, matrix* savedu, matrix* lhs=NULL);
         static void copyOperatorL2(matrix* a, matrix* l, matrix* u, matrix* bl2, matrix* bu2, int n);
-        static void copyOperatorX2(matrix* a, matrix* x1, matrix* y1, matrix* lhs1, matrix* mx2, int n);
+        static void copyOperatorX2(matrix* a, matrix* x1, matrix* y1, matrix* lhs1, matrix* mx2, int n, matrix* my2, matrix* lhs2);
 
         static void calculate();
 
@@ -40,7 +40,7 @@ namespace SOGLU
 
         static bool checkSymmetric(matrix* mat, int n, int blocksize, int* indexi, int* indexj, double* vals, int valcount);
 
-        static void blockMatrixLU(matrix* a, matrix* l, matrix* u, int n, matrix* l3, matrix* u3, int group, matrix* x, matrix* y, matrix* lhs);
+        static void blockMatrixLU(matrix* a, matrix* l, matrix* u, int n, matrix* l3, matrix* u3, int group, matrix* x, matrix* y, matrix* lhs, matrix* y2);
         static void blockMatrixLU(matrix* a, matrix* l, matrix* u, int n, matrix* hl1, matrix* hu1, int group=0);
         static void blockMatrixLLT(matrix* a, matrix* l, int n, matrix* hl1, int group=0);
         

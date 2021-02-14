@@ -125,6 +125,12 @@ void mtx::sampleArray(double *a, int dim){
             std::cout<<" "<<a[dim-3]<<" "<<a[dim-2]<<" "<<a[dim-1]<<" ";
         }
         std::cout <<'\n';
+
+        for(int i=0;i<dim;i++){
+//            printf("%9.5g    ",a[i]); 
+ //           if(i%8==0) printf("\n");
+        }
+        std::cout <<'\n';
 }
 
 void mtx::writeArray(std::string fname, double *a, int dim){
@@ -175,7 +181,7 @@ int mtx::readArray(std::string fname, int dim){
     } 
     
     for(int i=count; i<dim; i++){
-        b[i] = 1;
+        b[i] = 1;   // 1
     }
    
     return count;

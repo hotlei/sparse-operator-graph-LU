@@ -140,12 +140,13 @@ namespace SOGLU {
 
             matrix *mx =  BlockPlanner::iniVectorMatrix(n);
             matrix *my =  BlockPlanner::iniVectorMatrix(n);
+            matrix *my2 =  BlockPlanner::iniVectorMatrix(n);
             matrix *mlhs =  BlockPlanner::iniVectorMatrix(n);
             
             if(data::symmetric)
                 BlockPlanner::blockMatrixLLT(data::blocks, bl, n, NULL);
             else
-                BlockPlanner::blockMatrixLU(data::blocks, bl, bu, n, NULL, NULL,0, mx, my, mlhs);
+                BlockPlanner::blockMatrixLU(data::blocks, bl, bu, n, NULL, NULL,0, mx, my, mlhs,my2);
 
             std::cout<<"blocks: "<<data::blockRows<<" blockSize: "<<data::blockSize<<" inputSize: "<<data::mSize  
                      <<" extend: "<<data::blockRows * data::blockSize<<" op count: "<<data::graph.size()<<
@@ -160,9 +161,10 @@ namespace SOGLU {
             data::blockSize = BLOCK64;
             int levelall = __builtin_popcount(data::blockRows-1);
             matrix *x2 = memutil::newmatrix(0,data::blockRows,levelall);
+            matrix *lhs2 = memutil::newmatrix(0,data::blockRows,levelall);
 
      //       if(!data::symmetric)
-                BlockPlanner::copyOperatorX2(data::blocks, mx, my, mlhs, x2, n);
+                BlockPlanner::copyOperatorX2(data::blocks, mx, my, mlhs, x2, n,my2, lhs2);
             memutil::freeAllSmallMem(0);
             n = data::blockRows;
 
@@ -170,7 +172,7 @@ namespace SOGLU {
                      <<" extend: "<<data::blockRows * data::blockSize<<" op count: "<<data::graph.size()<<
                        " storage: "<<data::storageCount<<std::endl;
 
-            BlockPlanner::blockPlan(x2, NULL);
+            BlockPlanner::blockPlan(x2, NULL, lhs2);
             std::chrono::duration<double> time_plan = 
                 std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now()-timestart);
             std::cout << "plan time: "<<time_plan.count() <<'\n';
@@ -188,7 +190,7 @@ namespace SOGLU {
 
             double *xx =  (double*)memutil::getSmallMem(0, config::blockRows * config::blockSize * sizeof(double));
             std::memset(xx, 0, config::blockRows * config::blockSize * sizeof(double));
-            BlockPlanner::getFirstColumn(x2, xx, config::blockRows * config::blockSize);
+            BlockPlanner::getFirstColumn(x2, xx, config::blockRows);
             std::chrono::duration<double> time_solve =
                 std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now()-solvestart);
             std::cout << "solve triangled :"<<time_solve.count() <<'\n';

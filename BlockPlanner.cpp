@@ -70,32 +70,47 @@ namespace SOGLU
             return true;
         }
 
-        int addInput(matrix* a, int* lastuse)
+        int addInput(matrix* a, int* traced)
         {
             int count = 0;
             if(a->level == 0 && a->blockindex >0){
                 data::stage[a->blockindex] = 1;
                 data::laststage[a->blockindex] = 1;
-                lastuse[a->blockindex] = 0;
+                traced[a->blockindex] = 0;
                 count = 1;
             }else if(a->level > 0){
                 for(int i=0; i<4; i++)
                     if(a->submatrix[i] != NULL)
-                        count += addInput(a->submatrix[i], lastuse);
+                        count += addInput(a->submatrix[i], traced);
             }
             return count;
         }
-        int addOutput(matrix* a, int* lastuse, int marker)
+        int addIntermediate(matrix* a, int* traced)
+        {
+            int count = 0;
+            if(a->level == 0 && a->blockindex >0){
+                data::stage[a->blockindex] = 2;
+                data::laststage[a->blockindex] = 2;
+                traced[a->blockindex] = 0;
+                count = 1;
+            }else if(a->level > 0){
+                for(int i=0; i<4; i++)
+                    if(a->submatrix[i] != NULL)
+                        count += addIntermediate(a->submatrix[i], traced);
+            }
+            return count;
+        }
+        int addOutput(matrix* a, int* traced, int marker)
         {
             int count = 0;
             if(a->level == 0 && a->blockindex >0){
                 data::laststage[a->blockindex] = marker;
-                lastuse[a->blockindex] = marker;
+                traced[a->blockindex] = 1;
                 count = 1;
             }else if(a->level > 0){
                 for(int i=0; i<4; i++)
                     if(a->submatrix[i] != NULL)
-                        count += addOutput(a->submatrix[i], lastuse, marker);
+                        count += addOutput(a->submatrix[i], traced, marker);
             }
             return count;
         }
@@ -114,89 +129,102 @@ namespace SOGLU
         {
             long i, cnt = 0;
 
-            int *lastuse = new int[data::storageCount];
-            for(i=0;i<data::storageCount; i++){
-                lastuse[i] = 0;
-            }
-
+            int *traced = new int[data::storageCount];
             data::stage.reset(new int[data::storageCount]);
             data::laststage.reset(new int[data::storageCount]);
-            int maxx = data::storageCount;
+            int maxx = data::graph.size();
             int maxcnt = 0;
             for(i=0;i<data::storageCount;i++){
-                lastuse[i] = 0;
+                traced[i] = 0;
                 data::stage[i] = 0;
                 data::laststage[i] = 0;
             }
 
-            data::stage[0] = 1;
-            cnt = addInput(data::blocks, lastuse);
+            data::stage[0] = 0;
+            traced[0] = 0; 
+            cnt = addInput(data::blocks, traced);
 
             if(lhs != NULL) {
-                cnt += addInput(lhs, lastuse);
+                cnt += addIntermediate(lhs, traced);
             }
 
             if (saved != NULL) {
-                maxcnt += addOutput(saved, lastuse, maxx);
+                maxcnt += addOutput(saved, traced, maxx);
             }
 
             if (savedu != NULL) {
-                maxcnt += addOutput(savedu, lastuse, maxx);
+                maxcnt += addOutput(savedu, traced, maxx);
             }
+
 
             for (i = data::graph.size() - 1; i >= 0; i--)
             {
                 operation* o = data::graph[i];
 
-                int stg = 0;
-                if (o->result > 0)
+                int onpath = 0;
+                if (o->result > 0 && traced[o->result] == 1)
                 {
-                    stg = o->result;
-                    if (o->result2 > 0 && o->result2 > stg)
+                    onpath = 1;
+                }
+                if (o->result2 > 0 && traced[o->result2] == 1)
+                {
+                    onpath = 1;
+                }
+
+                if (onpath == 1)
+                {
+                    if (o->src > 0)
                     {
-                        stg = o->result2;
-                    }
-                }
-
-                if (o->result > 0 && o->result2 > 0)
-                {
-                    if (lastuse[o->result] == 0 && lastuse[o->result2] == 0)
-                        continue;
-                }
-
-                if (o->result > 0 && o->result2 == 0)
-                {
-                    if (lastuse[o->result] == 0)
-                        continue;
-                }
-
-                if (stg > 0)
-                {
-                    if (o->src > 0){
-                        if (lastuse[o->src] < stg)
-                            lastuse[o->src] = stg;
+                            traced[o->src] = 1;
                     }
                     if (o->src2 > 0)
                     {
-                        if(o->src2>= data::storageCount){
-                           continue;
-                        }
-                        if (lastuse[o->src2] < stg)
-                            lastuse[o->src2] = stg;
+                            traced[o->src2] = 1;
                     }
                 }
             }
+           
+            int updated = 0;
+            do {
+                updated = 0;
+                for (i = 0; i<data::graph.size(); i++){
+                    operation* o = data::graph[i];
+                    int onpath = 0;
+                    if (o->result > 0 && traced[o->result] == 1)
+                    {
+                        onpath = 1;
+                    }
+                    if (o->result2 > 0 && traced[o->result2] == 1)
+                    {
+                        onpath = 1;
+                    }
+
+                    if (onpath == 1)
+                    {
+                        if (o->src > 0 && traced[o->src] == 0){
+                            updated++;
+                            traced[o->src] = 1;
+                        }
+                        if (o->src2 > 0 && traced[o->src2] == 0){
+                            updated++;
+                            traced[o->src2] = 1;
+                        }
+                    }
+                }
+                std::cout<<"update last used: "<<updated<<std::endl;
+            }while(updated > 0);
 
             int wastecount = 0;
 
             for (i = 0; i < data::graph.size(); i++)
             {
                 operation* o = data::graph[i];
-                if (lastuse[o->result] > 0) continue;
-                if (o->result2 > 0 && lastuse[o->result2] > 0) continue;
+                if (traced[o->result] > 0) continue;
+                if (o->result2 > 0 && traced[o->result2] > 0) continue;
                 ++wastecount;
             }
-        if(data::PlanL2 || wastecount>(data::graph.size()/25)){ // /25
+        if(data::PlanL2 || wastecount>(data::graph.size()/25)) // /25
+        {
             int bufcount = data::graph.size() - wastecount;
             operation *buf = new operation[bufcount];
             int bufcounter = 0;
@@ -204,7 +232,7 @@ namespace SOGLU
             {
                 operation* o = data::graph[i];
                 
-                if (lastuse[o->result] > 0)
+                if (traced[o->result] > 0)
                 {
                     buf[bufcounter].sett(o->src, o->src2, o->op, o->result, o->result2);
                     buf[bufcounter].sequenceNum = o->sequenceNum;
@@ -212,7 +240,7 @@ namespace SOGLU
                     bufcounter++;
                     continue;
                 }
-                if (o->result2 > 0 && lastuse[o->result2] > 0)
+                if (o->result2 > 0 && traced[o->result2] > 0)
                 {
                     buf[bufcounter].sett(o->src, o->src2, o->op, o->result, o->result2);
                     buf[bufcounter].sequenceNum = o->sequenceNum;
@@ -235,31 +263,34 @@ namespace SOGLU
             std::cout<<"reduced ops to: " + std::to_string(data::graph.size())<<std::endl;
 
             int maxstg = 1;
+            do{
+                updated = 0;
             for (i = 0; i < data::graph.size(); i++)
             {
                 operation* o = data::graph[i];
                 int stg = 0;
-                if (o->src > 0)
+                if(o->result == 305)
+                    stg = 0;
+                if (o->src > 0 && data::stage[o->src] > 0 &&
+                    o->src2 > 0 && data::stage[o->src2] > 0)
                 {
                     stg = data::stage[o->src] + 1;
-                    if(stg < 2) stg = 2;
-                    if (o->src2 > 0)
-                    {
                         if (data::stage[o->src2] + 1 > stg)
                         {
                             stg = data::stage[o->src2] + 1;
                         }
-                    }
-                }else{
+                }
 
-                    if (o->src2 > 0)
-                    {
-                        if (data::stage[o->src2] + 1 > stg)
-                        {
-                            stg = data::stage[o->src2] + 1;
-                        }
-                    }
-                    if(stg < 2) stg = 2;
+                if (o->src > 0 && data::stage[o->src] > 0 &&
+                    o->src2 == 0)
+                {
+                    stg = data::stage[o->src] + 1;
+                }
+
+                if (o->src == 0 &&
+                    o->src2 > 0 && data::stage[o->src2] > 0)
+                {
+                    stg = data::stage[o->src2] + 1;
                 }
 
                 if (stg > 1)
@@ -267,16 +298,68 @@ namespace SOGLU
                     o->stage = stg;
                     if (o->result > 0 && data::stage[o->result] < stg)
                     {
+                        updated++;
                         data::stage[o->result] = stg;
                     }
                     if (o->result2 > 0 && data::stage[o->result2] < stg)
                     {
+                        updated++;
                         data::stage[o->result2] = stg;
                     }
                     if (stg > maxstg)
                         maxstg = stg;
                 }
             }
+            std::cout<<"updated stage: "<<updated<<"   ";
+            for (i = data::graph.size()-1; i>=0; i--)
+            {
+                operation* o = data::graph[i];
+                int stg = 0;
+                if(o->result == 305)
+                    stg = 0;
+                if (o->src > 0 && data::stage[o->src] > 0 &&
+                    o->src2 > 0 && data::stage[o->src2] > 0)
+                {
+                    stg = data::stage[o->src] + 1;
+                        if (data::stage[o->src2] + 1 > stg)
+                        {
+                            stg = data::stage[o->src2] + 1;
+                        }
+                }
+
+                if (o->src > 0 && data::stage[o->src] > 0 &&
+                    o->src2 == 0)
+                {
+                    stg = data::stage[o->src] + 1;
+                }
+
+                if (o->src == 0 &&
+                    o->src2 > 0 && data::stage[o->src2] > 0)
+                {
+                    stg = data::stage[o->src2] + 1;
+                }
+
+                if (stg > 1)
+                {
+                    o->stage = stg;
+                    if (o->result > 0 && data::stage[o->result] < stg)
+                    {
+                        updated++;
+                        data::stage[o->result] = stg;
+                    }
+                    if (o->result2 > 0 && data::stage[o->result2] < stg)
+                    {
+                        updated++;
+                        data::stage[o->result2] = stg;
+                    }
+                    if (stg > maxstg)
+                        maxstg = stg;
+                }
+            }
+            std::cout<<updated<<std::endl;
+            }while(updated>0 && maxstg <= data::graph.size());
+
+            std::cout<<"max stage: "<<maxstg<<std::endl;
 
             // fix stg
             for(i=data::graph.size()-1; i>=0; i--){
@@ -382,7 +465,7 @@ namespace SOGLU
                     }
             }
 
-            delete [] lastuse;
+            delete [] traced;
         }
 
           void BlockPlanner::calculate()
@@ -404,8 +487,6 @@ namespace SOGLU
                 if(stagerange[st*2] > li) stagerange[st*2] = li;
                 if(stagerange[st*2+1] < li) stagerange[st*2+1] = li;
             }
-
-
 
         for(int w=0;w<maxstage*2+2;w+=2){
 
@@ -439,8 +520,6 @@ namespace SOGLU
             for(int ci=0;ci<streamcount[si];ci++){
                 operation o = *(data::graph[stream[si*8192+ci]]);
                 int multimul = 1;
-  //     printf("%8d  %8d  %8d src %8d %8d op %4d result %8d %8d thread %4d \n",
-  //          o.stage, o.groupNum, o.sequenceNum, o.src, o.src2, o.op, o.result, o.result2, tid);
                 if (o.result > 0)
                 {
                     if (data::blockstorage[o.result] == NULL)
@@ -478,6 +557,8 @@ namespace SOGLU
                         MatrixStdDouble::inv_lower(data::blockstorage[o.src], data::blockSize, data::blockstorage[o.result]);
                         break;
                     case blockOp::mul:
+                        if(data::blockstorage[o.src] == NULL || data::blockstorage[o.src2] ==NULL)
+                            std::cout<<"a "<<o.src<<"   b "<<o.src2<<std::endl;
                         MatrixStdDouble::blockMulOneAvxBlock(data::blockstorage[o.src], data::blockstorage[o.src2], 
                                 data::blockstorage[o.result], 0, tid);
                         break;
@@ -800,7 +881,7 @@ namespace SOGLU
                 std::cout<<"found NaN:  " + std::to_string(nancount)<<std::endl;
         }
 
-        void BlockPlanner::blockMatrixLU(matrix* a, matrix* l, matrix* u, int n, matrix* l3, matrix* u3, int group, matrix* x, matrix* y, matrix* lhs)
+        void BlockPlanner::blockMatrixLU(matrix* a, matrix* l, matrix* u, int n, matrix* l3, matrix* u3, int group, matrix* x, matrix* y, matrix* lhs, matrix* y2)
         {
             int hn = n / 2;
             double *tmp = NULL;
@@ -831,7 +912,7 @@ namespace SOGLU
                 hl1 = memutil::newmatrix(0,a->blockrows2/4,a->level-2);
                 hu1 = memutil::newmatrix(0,a->blockrows2/4,a->level-2);
             }
-            blockMatrixLU(ha,l1,u1,n/2,hl1,hu1,group,x->submatrix[0],y->submatrix[0],lhs->submatrix[0]);
+            blockMatrixLU(ha,l1,u1,n/2,hl1,hu1,group,x->submatrix[0],y->submatrix[0],lhs->submatrix[0],y2->submatrix[0]);
             blockMatrixInvLower(l1,l2,n/2,hl1,group);
             blockMatrixInvUpper(u1,u2,n/2,hu1,group);
             l->submatrix[0] = l1;                // l2 ????
@@ -840,7 +921,8 @@ namespace SOGLU
             if(a->level == 1)
             {
                 blockMatrixMul(l2,lhs->submatrix[0],y->submatrix[0],hn,group);
-                blockMatrixMul(u2,y->submatrix[0],x->submatrix[0],hn,group);
+                blockMatrixCopy(y->submatrix[0], y2->submatrix[0],hn,group);
+                blockMatrixMul(u2,y2->submatrix[0],x->submatrix[0],hn,group);
             }
 
             matrix* aua1b = memutil::newmatrix(0,a->blockrows2/2,a->level-1);
@@ -849,7 +931,7 @@ namespace SOGLU
                 matrix* a1b = memutil::newmatrix(0,a->blockrows2/2,a->level-1);
                 blockMatrixMul(l2,b,aua1b,hn,group);
                 u->submatrix[1] = aua1b;
-                blockMatrixMulNeg(aua1b,x->submatrix[2],y->submatrix[0],hn,group);
+                blockMatrixMulNeg(aua1b,x->submatrix[2],y2->submatrix[0],hn,group);
             }
 
             matrix* dsub = memutil::newmatrix(0,a->blockrows2/2,a->level-1);
@@ -862,10 +944,6 @@ namespace SOGLU
                 blockMatrixMul(c,u2,ca1al,hn,group);
                 l->submatrix[2] = ca1al;
 
-        //    matrix* y2 = memutil::newmatrix(0,a->blockrows2/2,a->level-1);
-        //    matrix* b2 = memutil::newmatrix(0,a->blockrows2/2,a->level-1);
-        //    blockMatrixMul(ca1al,y->submatrix[0],y2,hn,group);
-        //    blockMatrixSub(lhs->submatrix[2],y2,b2,hn,group);
                 blockMatrixMulNeg(ca1al,y->submatrix[0],lhs->submatrix[2],hn,group);
 
                 matrix* ca1b = memutil::newmatrix(0,a->blockrows2/2,a->level-1);
@@ -884,18 +962,19 @@ namespace SOGLU
                 dl1 = memutil::newmatrix(0,a->blockrows2/4,a->level-2);
                 du1 = memutil::newmatrix(0,a->blockrows2/4,a->level-2);
             }
-            blockMatrixLU(dsub,l1,u1,hn,dl1,du1,group,x->submatrix[2],y->submatrix[2],lhs->submatrix[2] );
+            blockMatrixLU(dsub,l1,u1,hn,dl1,du1,group,x->submatrix[2],y->submatrix[2],lhs->submatrix[2],y2->submatrix[2] );
             l->submatrix[3] = l1;
             u->submatrix[3] = u1;
 
             if(a->level == 1)
             {
-             //   hl1 = memutil::newmatrix(0,a->blockrows2/4,a->level-2);
-             //   hu1 = memutil::newmatrix(0,a->blockrows2/4,a->level-2);
-                blockMatrixInvLower(l1,l2,n/2,NULL,group);
-                blockMatrixMul(l2,lhs->submatrix[2],y->submatrix[2],hn,group);
-                blockMatrixInvUpper(u1,u2,n/2,NULL,group);
-                blockMatrixMul(u2,y->submatrix[2],x->submatrix[2],hn,group);
+                matrix* l1i = memutil::newmatrix(0,hn,a->level-1);
+                matrix* u1i = memutil::newmatrix(0,hn,a->level-1);
+                blockMatrixInvLower(l1,l1i,hn,NULL,group);
+                blockMatrixInvUpper(u1,u1i,hn,NULL,group);
+                blockMatrixMul(l1i,lhs->submatrix[2],y->submatrix[2],hn,group);
+                blockMatrixCopy(y->submatrix[2], y2->submatrix[2],hn,group);
+                blockMatrixMul(u1i,y2->submatrix[2],x->submatrix[2],hn,group);
             }
         }
         void BlockPlanner::blockMatrixLU(matrix* a, matrix* l, matrix* u, int n, matrix* l3, matrix* u3, int group)
@@ -1151,13 +1230,18 @@ namespace SOGLU
         void BlockPlanner::printInt(matrix* a, int n)
         {
                int line = 8;
-               for(int i=0;i<n*n;i++){
+               for(int j=0;j<n;j++)
+               for(int k=0;k<n;k++){
+                  int i = j * n + k;
                   int e = a[0][i];
                   if(e == 0)
-                      std::cout<<"   "<<"  \b";
-                  else
-                      std::cout<<e<<"  \b";
-                  if((i%line)==line-1)
+                      std::cout<<"   "<<"  ";
+                  else{
+                      if(j==k)
+                         std::cout<<"d ";
+                      std::cout<<e<<"  ";
+                  }
+                  if(k==n-1)
                      std::cout<<std::endl;
                }
   
@@ -1373,7 +1457,7 @@ namespace SOGLU
             }
         }
 
-        void BlockPlanner::copyOperatorX2(matrix* a, matrix* x1, matrix* y1, matrix* lhs1, matrix* mx2, int n)
+        void BlockPlanner::copyOperatorX2(matrix* a, matrix* x1, matrix* y1, matrix* lhs1, matrix* mx2, int n, matrix* y2, matrix* lhs2)
 	{
             blockstorageL2.clear();
             storageCountL2 =0;
@@ -1388,6 +1472,8 @@ namespace SOGLU
 		   
             mx2->blockrows2 = data::blockRows;
             mx2->level = __builtin_popcount(data::blockRows - 1);
+            lhs2->blockrows2 = data::blockRows;
+            lhs2->level = __builtin_popcount(data::blockRows - 1);
 
 	    blockstorageL2.resize(data::blockstorage.size(),NULL);
 	    storageCountL2 = blockstorageL2.size();
@@ -1399,11 +1485,13 @@ namespace SOGLU
             std::memset(xx, 0, config::blockRows * config::blockSize * sizeof(double));
             matrix *mx =  BlockPlanner::iniVectorMatrix(xx, config::blockRows);
             matrix *my =  BlockPlanner::iniVectorMatrix(xx, config::blockRows);
+            matrix *my2 =  BlockPlanner::iniVectorMatrix(xx, config::blockRows);
             matrix *mlhs =  BlockPlanner::iniVectorMatrix(data::b, config::blockRows);
 
             matrixZoomSet(a, data::blocks);
             matrixZoomSet(x1, mx);
             matrixZoomSet(y1, my);
+            matrixZoomSet(y2, my2);
             matrixZoomSet(lhs1, mlhs);
 
 	    graphL2.clear();
@@ -1503,6 +1591,7 @@ namespace SOGLU
 	    }
 
             matrixZoomUpdate(x1, mx2);
+            matrixZoomUpdate(lhs1, lhs2);
 
 
             blockstorageL2.clear();
@@ -1674,14 +1763,14 @@ namespace SOGLU
                 double* dmp = data::blockstorage[m->blockindex];
                 unsigned short *metad = (unsigned short *) (dmp + DETAILOFFSET);
                 for(int i=0;i<BLOCK64;i++){
-      //              if(metad[i%32+(i/32)*DETAILSKIPSHORT] & 1 )
+                    if(metad[i%32+(i/32)*DETAILSKIPSHORT] & 1 )
                         b[i] = dmp[i*BLOCKCOL];
                 }
                 return;
             }
             int n2 = n / 2;
             getFirstColumn(m->submatrix[0], b, n2);
-            getFirstColumn(m->submatrix[2], b+n2, n2);
+            getFirstColumn(m->submatrix[2], b+n2*BLOCK64, n2);
         }
         void assignFirstColumn(matrix *m, double* b, int n)
         {
@@ -1700,7 +1789,7 @@ namespace SOGLU
                 BlockPlanner::appendBlockStorageAgain(dmp, m->blockindex);
                 return;
             }
-            int n2 = m->blockrows2 / 2;
+            int n2 = n / 2;
             m->submatrix[0] = memutil::newmatrix(0,n2,m->level-1);
             m->submatrix[2] = memutil::newmatrix(0,n2,m->level-1);
             assignFirstColumn(m->submatrix[0], b, n2);
@@ -1794,6 +1883,8 @@ namespace SOGLU
             uint64_t t = data::blockstorage.size();
             data::blockstorage.push_back( dmp );
             data::storageCount = t+1;
+            if(t == 26878)
+               std::cout<<std::endl;
             return t;
         }
 	uint64_t BlockPlanner::allocateBlock(int bi, int bj)
@@ -1809,6 +1900,8 @@ namespace SOGLU
             data::blockstorage.push_back( dmp );
             data::blocks->set(((uint64_t)bi) * data::blockRows + bj, t);
             data::storageCount = t+1;
+            if(t == 26878)
+               std::cout<<std::endl;
             return t;
         }
         void BlockPlanner::appendBlockStorageAgain(double t[], int rtn)
@@ -1828,6 +1921,8 @@ namespace SOGLU
                 std::cout<<" storage overflow "<<std::endl;
                 exit(0);
             }
+            if(rtn == 26878)
+               std::cout<<std::endl;
             return rtn;
         }
 }
