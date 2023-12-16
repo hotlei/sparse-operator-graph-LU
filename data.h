@@ -1,41 +1,84 @@
-﻿/*
-    This file is part of sparse-operator-graph-LU.
-    Copyright (C) 2020, 2021 Lei Yan (yan_lei@hotmail.com)
-
-    sparse-operator-graph-LU is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    sparse-operator-graph-LU is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with sparse-operator-graph-LU.  If not, see <https://www.gnu.org/licenses/>.
-*/
-
-#include <iostream>     
-#include <algorithm>   
-#include <vector>     
+﻿#include <iostream>     // std::cout
+#include <algorithm>    // std::sort
+#include <vector>       // std::vector
+#include <set>       // std::vector
 #include <memory>
 #include <string>
 
-#include "const.h"
+#define BLOCK64 64
+#define BLOCK16 16 
+#define NUMSTREAM 23 
 
-namespace SOGLU {
+namespace vmatrix {
+    enum blockOp { inv, lu, lowerInv, upperInv, sub, add, neg, copy, mul, mulneg,noop};
+
+    class position
+    {
+        
+        public:
+        int value;
+        int index;
+        position(int idx, int val);
+    };
+
+        bool positionCompare(position x, position y);
+
+    struct edge
+    {
+        public:
+        int row;
+        int col;
+        edge(int i, int j);
+        edge();
+        void sett(int i, int j);
+    };
+        bool edgeCompare(edge* x, edge* y);
+
+    struct operation
+    {
+        public:
+        int src, src2;
+        blockOp op;
+        int result, result2;
+        bool skip;
+        int stage;
+        int sequenceNum;
+        static int seq;
+
+        operation();
+        operation(int src1, int s2, blockOp o, int d1, int d2);
+        void sett(int src1, int s2, blockOp o, int d1, int d2);
+    };
+    
+        bool operationCompare(operation* x, operation* y);
+
     class data
     {
+        
+   //     static {
+   //         data::blockSize = 64;
+   //         data::storageCount=1;
+   //     }
+
         public:
         static int mSize;
         static int mSize_out;
         static int blockRows;
+        static int blockRows_sq;
         static int blockSize;
-        static matrix* blocks;
-        static bool symmetric;
+        static int *blocks;
+        static int gpuMB;
  
+        static int blockRowsL2;
+        static int blockSizeL2;
+        static int blockScaleL2;
+        static std::vector<int*> blockstorageL2;
+        static int storageCountL2;
+        static std::vector<operation*> seqL2;
         static bool PlanL2;
+        static std::vector<operation*> operationBufferL2;
+        static int operationPointerL2;
+        static operation* newoperationL2(int src1, int s2, blockOp o, int d1, int d2);
 
         static int *indexi;
         static int *indexj;
@@ -44,14 +87,38 @@ namespace SOGLU {
         static std::vector<double*> blockstorage;
         static int storageCount;
 
+        static int lucount;
+        static int linvcount;
+        static int uinvcount;
+        static int mulcount;
+        static int invertcount;
+        static int foundzeroblock;
+        static int storageResizeCount;
+        static int getBlockCount; 
+        static int blockMulCount;
         static double *b;
         static double *x;
+        static std::string fileName;
  
-        static std::vector<operation*> graph;
+        static std::vector<operation*> seq;
         static std::unique_ptr<int[]> stage;
         static std::unique_ptr<int[]> laststage;
+        static bool UseCPU ;
 
+        static std::vector<operation*> operationBuffer;
+        static int operationPointer;
+        static operation* newoperation(int src1, int s2, blockOp o, int d1, int d2);
+
+        static std::vector<edge*> edgeBuffer;
+        static int edgePointer;
+        static edge* newedge(int d1, int d2);
+
+        static std::vector<double*> blockStorageBuffer;
+        static int blockStoragePointer;
+        static double* newalignedblock();
+
+        static int checkBandwidth();
         static void clear();
-        static void clearOperations();
+        static void clearSeq();
     };
 }

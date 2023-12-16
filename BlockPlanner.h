@@ -1,77 +1,111 @@
-﻿/*
-    This file is part of sparse-operator-graph-LU.
-    Copyright (C) 2020, 2021 Lei Yan (yan_lei@hotmail.com)
-
-    sparse-operator-graph-LU is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    sparse-operator-graph-LU is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with sparse-operator-graph-LU.  If not, see <https://www.gnu.org/licenses/>.
-*/
-
-namespace SOGLU
+﻿
+namespace vmatrix
 {
     class BlockPlanner
     {
         public:
+        static int countBlockEntry(int a[], int n);
 
-        static ushort mask[16]; 
-        static std::vector<int> tbd;
-        static long stream[NUMSTREAM*8192];
-        static int  streamcount[NUMSTREAM];
-        static std::vector<matrix*> blockstorageL2;
-        static int storageCountL2;
-        static std::vector<operation*> graphL2;
-
-        static void blockPlan(matrix* saved, matrix* savedu);
-        static void copyOperatorL2(matrix* a, matrix* l, matrix* u, matrix* bl2, matrix* bu2, int n);
+        static void blockPlan(int saved[], int savedLength, int savedu[], int saveduLength);
+        static void copySeqL2(int a[], int l[], int u[], int **bl2, int **bu2, int n);
 
         static void calculate();
 
-        static void solve(matrix* bl, matrix* bu, double b[], int n);
+        static void sovle(int bl[], int bu[], double b[], int n);
 
-        static bool checkSymmetric(matrix* mat, int n, int blocksize, int* indexi, int* indexj, double* vals, int valcount);
+        static void assignB();
 
-        static void blockMatrixLU(matrix* a, matrix* l, matrix* u, int n, matrix* hl1, matrix* hu1, int group=0);
-        static void blockMatrixLLT(matrix* a, matrix* l, int n, matrix* hl1, int group=0);
+        static void solveUpper(double bu[], double y[], double x[], int n, int offset);
+        static void bx(double bu[], double y[], double x[], int n, int ioffset, int joffset);
+
+        static void solveLower(double bl[], double b[], double y[], int n, int offset);
+
+        static void cy(double bl[], double b[], double y[], int n, int ioffset, int joffset);
         
-        static void blockMatrixInv(matrix* a, matrix* y, int n, int group=0);
+       static int countStrorageEntry(int n, int stage);
+
+        static int  checkMatrixEntry(int a[], int n);
+        static double* checkDiagEntry(int a[], int n);
+
+        static void blockLUOne(int a[], int l[], int u[]);
         
-        static void blockMatrixInvLower(matrix* l, matrix* y, int n, matrix* hl1, int group=0);
+        static void blockLU(int a[], int l[], int u[], int n);
+        static void blockInvOne(int a[], int y[]);
+        
+        static void blockInv(int a[], int y[], int n);
+        
+        static void blockInvLowerOne(int l[], int y[]);
+        
+        static void blockInvLower(int l[], int y[], int n);
 
-        static void blockMatrixInvUpper(matrix* u, matrix* y, int n, matrix* hu1, int group=0);
+        static void blockInvUpperOne(int u[], int y[]);
+        
+        static void blockInvUpper(int u[], int y[], int n);
 
-        static int blockScanNAN(matrix* a, int n);
+        static void blockScanNAN(int a[], int n);
 
-        static void blockMatrixSub(matrix* a, matrix* b, matrix* d, int n, int group=0);
-        static void blockMatrixCopy(matrix* a, matrix* d, int n, int group=0);
-        static void blockMatrixNeg(matrix* b, matrix* d, int n, int group=0);
+        static void blockSub(int a[], int b[], int d[], int n);
+        static void blockCopy(int a[], int d[], int n);
+        static void blockNeg(int b[], int d[], int n);
 
-        static void blockMatrixMul(matrix* a, matrix*b, matrix* c, int n, int group=0);
-        static void blockMatrixMulT(matrix* a, matrix*b, matrix* c, int n, int group=0);
-        static void blockMatrixMulNeg(matrix* a, matrix*b, matrix* c, int n, int group=0);
+        static bool isZeroBlock(double tmp[]);
+
+        static void blockMulSparseNeg(int aa[], int bb[], int c[], int n);
+
+        static ushort mask[16]; 
+
+        static void blockMulBit(int aa[], int bb[], int c[], int n);
+
+        static void blockMulBit2(int aa[], int bb[], int c[], int n);
+
+        static void blockMulBitNeg(int aa[], int bb[], int c[], int n);
+
+        static void blockMulSparse(int aa[], int bb[], int c[], int n);
+
+        static void blockMul(int a[], int b[], int c[], int n);
+
+        static void blockMulDiag(int a[], int b[], int c[], int n);
+
+        static void blockMulNeg(int a[], int e[], int c[], int n);
 
         static void resetOneBlock(double t[]);
-        static void resetOneBlockMeta(double t[]);
+        
+        static void resetBlocks(int t[], int n);
+        
+        static void blockMulOne(double a[], double b[], double c[]);
+        static void blockMulOneTrans(double a[], double b[], double c[]);
+        static void blockMulOneNaive(double a[], double b[], double c[]);
+        
+        static void blockMulOneNeg(double a[], double b[], double c[]);
+        static void blockMulOneNegTrans(double a[], double b[], double c[]);
+        static void blockMulOneNegNaive(double a[], double b[], double c[]);
+        
+        static void putBlockList(int tgt[], int tgtn, int rowStart, int colStart, int n, int val[]);
+        
+        static int* getBlockList(int src[],int srcn, int rowStart, int colStart, int n);
         
         static void checkBlock();
 
+        static void pushUp();
+
+        static void pushDown();
+
         static void iniBlockStorage();
         
-        static uint64_t allocateBlock(int bi, int bj);
+        static void allocateBlock(int bi, int bj);
+        
+        static int appendBlockStorageReal(double t[]);
         
         static void appendBlockStorageAgain(double t[], int rtn);
-        static void appendBlockStorageAgainL2(matrix* t, int rtn);
+        static void appendBlockStorageAgainL2(int t[], int rtn);
         
         static int appendBlockStorage(double t[]);
         
-        static void printInt(matrix* a, int n);
+        static int roundup(int count);
+        static void configL2();
+        
+        static int stageCount(int blockRows);
+        static void printInt(int a[], int n);
+
     };
 }
